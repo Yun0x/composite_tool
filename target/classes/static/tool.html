@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool 工具集</title>
+    <!-- 引入CryptoJS库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        /* ========== 全局基础样式 ========== */
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f4f6f8;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #0078d4;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            margin-top: 30px;
+            border-left: 4px solid #0078d4;
+            padding-left: 10px;
+            color: #222;
+            font-size: 20px;
+        }
+
+        textarea, input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus, input:focus {
+            border-color: #0078d4;
+            box-shadow: 0 0 3px rgba(0, 120, 212, 0.4);
+        }
+
+        /* ========== 模块容器 ========== */
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            transition: transform 0.15s;
+        }
+
+        .section:hover {
+            transform: translateY(-2px);
+        }
+
+        /* ========== 按钮区 ========== */
+        button {
+            margin: 6px 6px 10px 0;
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #0078d4;
+            color: #fff;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #005fa3;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            background: #565e64;
+        }
+
+        button.success {
+            background: #28a745;
+        }
+
+        button.success:hover {
+            background: #1e7e34;
+        }
+
+        button.warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        button.warning:hover {
+            background: #e0a800;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        /* ========== 输出区样式 ========== */
+        .output {
+            background: #f8f9fa;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-family: Consolas, monospace;
+            white-space: pre-wrap;
+            margin-top: 6px;
+            border: 1px solid #e1e1e1;
+            color: #222;
+            word-break: break-all;
+            min-height: 40px;
+        }
+
+        /* ========== 布局辅助类 ========== */
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .flex-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .half {
+            width: 48%;
+        }
+
+        .small-input {
+            width: 150px;
+        }
+
+        /* ========== 滚动与溢出 ========== */
+        .scrollable {
+            max-height: 250px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 8px;
+            border-radius: 6px;
+            font-family: Consolas, monospace;
+        }
+
+        /* ========== 分类标题分隔 ========== */
+        .category-title {
+            font-size: 22px;
+            margin-top: 50px;
+            color: #444;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 6px;
+        }
+
+        /* ========== 响应式布局 ========== */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .half {
+                width: 100%;
+            }
+        }
+
+        /* ========== 滚动条美化 ========== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #999;
+        }
+
+        /* ========== 颜色预览 ========== */
+        .color-preview {
+            width: 100%;
+            height: 40px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+
+<h1>✨ Tool 工具集合</h1>
+
+<!-- ================= 字符串与编码类 ================= -->
+<h2 class="category-title">🔗 字符串与编码类</h2>
+
+<div class="section">
+    <h2>URL 编码 / 解码</h2>
+    <textarea id="urlInput" rows="3" placeholder="输入字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="encodeURL()">URL 编码</button>
+        <button onclick="decodeURL()">URL 解码</button>
+    </div>
+    <div class="output" id="urlOutput"></div>
+</div>
+
+<div class="section">
+    <h2>Base64 编码 / 解码</h2>
+    <textarea id="base64Input" rows="3" placeholder="输入字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="encodeBase64()">Base64 编码</button>
+        <button onclick="decodeBase64()">Base64 解码</button>
+    </div>
+    <div class="output" id="base64Output"></div>
+</div>
+
+<div class="section">
+    <h2>HTML 实体 编码 / 解码</h2>
+    <textarea id="htmlInput" rows="3" placeholder="输入 HTML 字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="encodeHTML()">实体编码</button>
+        <button onclick="decodeHTML()">实体解码</button>
+    </div>
+    <div class="output" id="htmlOutput"></div>
+</div>
+
+<div class="section">
+    <h2>去除空格</h2>
+    <textarea id="trimInput" rows="3" placeholder="输入字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="trimAll()">去除全部空格</button>
+        <button onclick="trimSides()">去除首尾空格</button>
+    </div>
+    <div class="output" id="trimOutput"></div>
+</div>
+
+<div class="section">
+    <h2>字符串大小写转换</h2>
+    <textarea id="caseInput" rows="3" placeholder="输入字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="toUpper()">大写</button>
+        <button onclick="toLower()">小写</button>
+        <button onclick="capitalize()">首字母大写</button>
+    </div>
+    <div class="output" id="caseOutput"></div>
+</div>
+
+<div class="section">
+    <h2>驼峰 / 下划线 转换</h2>
+    <textarea id="camelInput" rows="3" placeholder="输入字符串，如 user_name 或 userName..."></textarea>
+    <div class="flex-row">
+        <button onclick="toCamelCase()">下划线 → 驼峰</button>
+        <button onclick="toSnakeCase()">驼峰 → 下划线</button>
+    </div>
+    <div class="output" id="camelOutput"></div>
+</div>
+
+<div class="section">
+    <h2>字符串长度检测</h2>
+    <textarea id="lenInput" rows="3" placeholder="输入任意字符串..."></textarea>
+    <button onclick="checkLength()">检测长度</button>
+    <div class="output" id="lenOutput"></div>
+</div>
+
+<div class="section">
+    <h2>字符统计（中/英/数字/空格）</h2>
+    <textarea id="countInput" rows="3" placeholder="输入字符串..."></textarea>
+    <button onclick="countChars()">统计字符</button>
+    <div class="output" id="countOutput"></div>
+</div>
+
+
+<!-- ================= 数据与对象类 ================= -->
+<h2 class="category-title">🧮 数据与对象类</h2>
+
+<div class="section">
+    <h2>一键生成实体类 set 赋值代码</h2>
+    <textarea id="entityInput" rows="4" placeholder="输入字段名，例如：userName, userAge..."></textarea>
+    <div class="flex-row">
+        <button onclick="generateSetter()">生成 set 语句</button>
+    </div>
+    <div class="output" id="entityOutput"></div>
+</div>
+
+<div class="section">
+    <h2>数组去重 / 排序</h2>
+    <textarea id="arrayInput" rows="4" placeholder="输入数组（如：1,5,3,5,2,1）..."></textarea>
+    <div class="flex-row">
+        <button onclick="uniqueArray()">去重</button>
+        <button onclick="sortArrayAsc()">升序排序</button>
+        <button onclick="sortArrayDesc()">降序排序</button>
+    </div>
+    <div class="output" id="arrayOutput"></div>
+</div>
+
+<div class="section">
+    <h2>数字进制转换（2 / 8 / 10 / 16）</h2>
+    <input id="numInput" placeholder="输入数字或字符串..." />
+    <div class="flex-row">
+        <button onclick="toBinary()">转二进制</button>
+        <button onclick="toOctal()">转八进制</button>
+        <button onclick="toHex()">转十六进制</button>
+    </div>
+    <div class="output" id="numOutput"></div>
+</div>
+
+
+<!-- ================= 时间与日期类 ================= -->
+<h2 class="category-title">📅 时间与日期类</h2>
+
+<div class="section">
+    <h2>当前时间显示</h2>
+    <div class="flex-row">
+        <button onclick="showCurrentTime()">获取当前时间</button>
+    </div>
+    <div class="output" id="timeNowOutput"></div>
+</div>
+
+<div class="section">
+    <h2>时间戳 ↔ 日期转换</h2>
+    <input id="timestampInput" placeholder="输入时间戳或日期 (YYYY-MM-DD HH:mm:ss)" />
+    <div class="flex-row">
+        <button onclick="timestampToDate()">时间戳 → 日期</button>
+        <button onclick="dateToTimestamp()">日期 → 时间戳</button>
+    </div>
+    <div class="output" id="timestampOutput"></div>
+</div>
+
+<div class="section">
+    <h2>两个时间间隔计算</h2>
+    <div class="flex-row">
+        <input class="half" id="timeA" placeholder="起始时间 YYYY-MM-DD HH:mm:ss" />
+        <input class="half" id="timeB" placeholder="结束时间 YYYY-MM-DD HH:mm:ss" />
+    </div>
+    <button onclick="calcTimeDiff()">计算间隔</button>
+    <div class="output" id="timeDiffOutput"></div>
+</div>
+
+
+<!-- ================= 加密与编码类 ================= -->
+<h2 class="category-title">🔐 加密与编码类</h2>
+
+<div class="section">
+    <h2>MD5 / SHA256 哈希</h2>
+    <textarea id="hashInput" rows="3" placeholder="输入字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="doMD5()">MD5</button>
+        <button onclick="doSHA256()">SHA256</button>
+    </div>
+    <div class="output" id="hashOutput"></div>
+</div>
+
+<div class="section">
+    <h2>AES 加密 / 解密</h2>
+    <textarea id="aesInput" rows="3" placeholder="输入文本..."></textarea>
+    <input id="aesKey" placeholder="输入密钥..." />
+    <div class="flex-row">
+        <button onclick="aesEncrypt()">AES 加密</button>
+        <button onclick="aesDecrypt()">AES 解密</button>
+    </div>
+    <div class="output" id="aesOutput"></div>
+</div>
+
+
+<!-- ================= JSON / 数据结构类 ================= -->
+<h2 class="category-title">🧾 JSON / 数据结构类</h2>
+
+<div class="section">
+    <h2>JSON 格式化 / 压缩 / 校验</h2>
+    <textarea id="jsonInput" rows="5" placeholder="输入 JSON 字符串..."></textarea>
+    <div class="flex-row">
+        <button onclick="formatJSON()">格式化</button>
+        <button onclick="compressJSON()">压缩</button>
+        <button onclick="validateJSON()">校验</button>
+    </div>
+    <div class="output" id="jsonOutput"></div>
+</div>
+
+<div class="section">
+    <h2>JSON ↔ CSV 转换</h2>
+    <textarea id="jsonCsvInput" rows="5" placeholder="输入 JSON 或 CSV 内容..."></textarea>
+    <div class="flex-row">
+        <button onclick="jsonToCsv()">JSON → CSV</button>
+        <button onclick="csvToJson()">CSV → JSON</button>
+    </div>
+    <div class="output" id="jsonCsvOutput"></div>
+</div>
+
+
+<!-- ================= 开发调试类 ================= -->
+<h2 class="category-title">🧰 开发调试类</h2>
+
+<div class="section">
+    <h2>HTTP 参数解析</h2>
+    <input id="queryInput" placeholder="例如 ?a=1&b=2 或 a=1&b=2" />
+    <button onclick="parseQuery()">解析</button>
+    <div class="output" id="queryOutput"></div>
+</div>
+
+<div class="section">
+    <h2>正则表达式测试工具</h2>
+    <input id="regexPattern" placeholder="输入正则表达式，如 \\d+" />
+    <textarea id="regexText" rows="3" placeholder="输入待测试文本..."></textarea>
+    <button onclick="testRegex()">测试匹配</button>
+    <div class="output" id="regexOutput"></div>
+</div>
+
+<div class="section">
+    <h2>JWT Token 解析</h2>
+    <textarea id="jwtInput" rows="3" placeholder="输入 JWT Token..."></textarea>
+    <button onclick="parseJWT()">解析</button>
+    <div class="output" id="jwtOutput"></div>
+</div>
+
+
+<!-- ================= 其他实用类 ================= -->
+<h2 class="category-title">🌈 其他实用类</h2>
+
+<div class="section">
+    <h2>随机颜色生成</h2>
+    <button onclick="generateColor()">生成随机颜色</button>
+    <div class="output" id="colorOutput"></div>
+    <div class="color-preview" id="colorPreview"></div>
+</div>
+
+<div class="section">
+    <h2>浏览器信息</h2>
+    <button onclick="getBrowserInfo()">查看浏览器信息</button>
+    <div class="output" id="browserOutput"></div>
+</div>
+
+<div class="section">
+    <h2>文本去重 / 排序</h2>
+    <textarea id="textCleanInput" rows="4" placeholder="多行文本..."></textarea>
+    <div class="flex-row">
+        <button onclick="removeDuplicateLines()">去重</button>
+        <button onclick="sortLines()">排序</button>
+    </div>
+    <div class="output" id="textCleanOutput"></div>
+</div>
+
+<script>
+    // ===============================
+    // 🔧 通用工具函数
+    // ===============================
+    function $(id) { return document.getElementById(id); }
+    function output(id, text) { $(id).innerText = text; }
+
+    // ===============================
+    // 🔗 URL 编码 / 解码
+    // ===============================
+    function encodeURL() {
+        output('urlOutput', encodeURIComponent($('urlInput').value));
+    }
+    function decodeURL() {
+        try { output('urlOutput', decodeURIComponent($('urlInput').value)); }
+        catch (e) { output('urlOutput', '解码失败：' + e.message); }
+    }
+
+    // ===============================
+    // 🔗 Base64 编码 / 解码
+    // ===============================
+    function encodeBase64() {
+        output('base64Output', btoa(unescape(encodeURIComponent($('base64Input').value))));
+    }
+    function decodeBase64() {
+        try { output('base64Output', decodeURIComponent(escape(atob($('base64Input').value)))); }
+        catch (e) { output('base64Output', '解码失败：' + e.message); }
+    }
+
+    // ===============================
+    // 🔗 HTML 实体编码 / 解码
+    // ===============================
+    function encodeHTML() {
+        const text = $('htmlInput').value;
+        output('htmlOutput', text.replace(/[<>&"']/g, c => ({
+            '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
+        }[c])));
+    }
+    function decodeHTML() {
+        const text = $('htmlInput').value;
+        const div = document.createElement('div');
+        div.innerHTML = text;
+        output('htmlOutput', div.textContent);
+    }
+
+    // ===============================
+    // ✂️ 去除空格
+    // ===============================
+    function trimAll() {
+        const text = $('trimInput').value;
+        output('trimOutput', text.replace(/\s+/g, ''));
+    }
+    function trimSides() {
+        const text = $('trimInput').value;
+        output('trimOutput', text.trim());
+    }
+
+    // ===============================
+    // 🔠 大小写转换
+    // ===============================
+    function toUpper() {
+        output('caseOutput', $('caseInput').value.toUpperCase());
+    }
+    function toLower() {
+        output('caseOutput', $('caseInput').value.toLowerCase());
+    }
+    function capitalize() {
+        const text = $('caseInput').value;
+        output('caseOutput', text.charAt(0).toUpperCase() + text.slice(1).toLowerCase());
+    }
+
+    // ===============================
+    // 🐍 驼峰 ↔ 下划线
+    // ===============================
+    function toCamelCase() {
+        output('camelOutput', $('camelInput').value.replace(/_([a-z])/g, (_, c) => c.toUpperCase()));
+    }
+    function toSnakeCase() {
+        output('camelOutput', $('camelInput').value.replace(/([A-Z])/g, "_$1").toLowerCase());
+    }
+
+    // ===============================
+    // 📏 字符串长度检测
+    // ===============================
+    function checkLength() {
+        const str = $('lenInput').value;
+        output('lenOutput', `字符串长度: ${str.length}`);
+    }
+
+    // ===============================
+    // 🔢 字符统计
+    // ===============================
+    function countChars() {
+        const str = $('countInput').value;
+        const len = str.length;
+        const zh = (str.match(/[\u4e00-\u9fa5]/g) || []).length;
+        const en = (str.match(/[a-zA-Z]/g) || []).length;
+        const num = (str.match(/\d/g) || []).length;
+        const sp = (str.match(/\s/g) || []).length;
+        const other = len - zh - en - num - sp;
+
+        output('countOutput',
+            `总长度: ${len}\n中文: ${zh}\n英文: ${en}\n数字: ${num}\n空格: ${sp}\n其他: ${other}`);
+    }
+
+    // ===============================
+    // 🧾 实体类字段赋值
+    // ===============================
+    function generateSetter() {
+        const text = $('entityInput').value;
+        const lines = text.split(/[\n,，\s]+/).filter(Boolean);
+        const result = lines.map(field => {
+            const camel = field.charAt(0).toUpperCase() + field.slice(1);
+            return `set${camel}(${field});`;
+        }).join('\n');
+        output('entityOutput', result);
+    }
+
+    // ===============================
+    // 🧮 数组去重 / 排序
+    // ===============================
+    function uniqueArray() {
+        const arr = $('arrayInput').value.split(/[\n,，\s]+/).filter(Boolean);
+        const result = Array.from(new Set(arr));
+        output('arrayOutput', result.join('\n'));
+    }
+    function sortArrayAsc() {
+        const arr = $('arrayInput').value.split(/[\n,，\s]+/).filter(Boolean);
+        const result = arr.sort((a, b) => a.localeCompare(b));
+        output('arrayOutput', result.join('\n'));
+    }
+    function sortArrayDesc() {
+        const arr = $('arrayInput').value.split(/[\n,，\s]+/).filter(Boolean);
+        const result = arr.sort((a, b) => b.localeCompare(a));
+        output('arrayOutput', result.join('\n'));
+    }
+
+    // ===============================
+    // 🔢 进制转换
+    // ===============================
+    function toBinary() {
+        const val = $('numInput').value.trim();
+        try {
+            const num = parseInt(val);
+            output('numOutput', num.toString(2));
+        } catch (e) {
+            output('numOutput', '转换失败：' + e.message);
+        }
+    }
+    function toOctal() {
+        const val = $('numInput').value.trim();
+        try {
+            const num = parseInt(val);
+            output('numOutput', num.toString(8));
+        } catch (e) {
+            output('numOutput', '转换失败：' + e.message);
+        }
+    }
+    function toHex() {
+        const val = $('numInput').value.trim();
+        try {
+            const num = parseInt(val);
+            output('numOutput', num.toString(16).toUpperCase());
+        } catch (e) {
+            output('numOutput', '转换失败：' + e.message);
+        }
+    }
+
+    // ===============================
+    // 📅 时间工具
+    // ===============================
+    function showCurrentTime() {
+        output('timeNowOutput', new Date().toLocaleString());
+    }
+    function timestampToDate() {
+        const ts = parseInt($('timestampInput').value);
+        if (isNaN(ts)) {
+            output('timestampOutput', '请输入有效的时间戳');
+            return;
+        }
+        output('timestampOutput', new Date(ts).toLocaleString());
+    }
+    function dateToTimestamp() {
+        const date = new Date($('timestampInput').value);
+        if (isNaN(date.getTime())) {
+            output('timestampOutput', '请输入有效的日期格式');
+            return;
+        }
+        output('timestampOutput', date.getTime());
+    }
+    function calcTimeDiff() {
+        const t1 = new Date($('timeA').value);
+        const t2 = new Date($('timeB').value);
+        if (isNaN(t1.getTime()) || isNaN(t2.getTime())) {
+            output('timeDiffOutput', '请输入有效的日期格式');
+            return;
+        }
+        const diff = Math.abs(t2 - t1);
+        const seconds = Math.floor(diff / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        output('timeDiffOutput',
+            `总毫秒数: ${diff}\n总秒数: ${seconds}\n总分钟数: ${minutes}\n总小时数: ${hours}\n总天数: ${days}`);
+    }
+
+    // 自动更新当前时间
+    setInterval(() => {
+        if ($('timeNowOutput').innerText) {
+            showCurrentTime();
+        }
+    }, 1000);
+
+    // ===============================
+    // 🔐 加密模块
+    // ===============================
+    function doMD5() {
+        output('hashOutput', CryptoJS.MD5($('hashInput').value).toString());
+    }
+    function doSHA256() {
+        output('hashOutput', CryptoJS.SHA256($('hashInput').value).toString());
+    }
+    function aesEncrypt() {
+        const key = CryptoJS.enc.Utf8.parse($('aesKey').value.padEnd(16, '0').substring(0, 16));
+        const text = $('aesInput').value;
+        const encrypted = CryptoJS.AES.encrypt(text, key, {
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.Pkcs7
+        }).toString();
+        output('aesOutput', encrypted);
+    }
+    function aesDecrypt() {
+        const key = CryptoJS.enc.Utf8.parse($('aesKey').value.padEnd(16, '0').substring(0, 16));
+        const text = $('aesInput').value;
+        try {
+            const decrypted = CryptoJS.AES.decrypt(text, key, {
+                mode: CryptoJS.mode.ECB,
+                padding: CryptoJS.pad.Pkcs7
+            }).toString(CryptoJS.enc.Utf8);
+            output('aesOutput', decrypted || '解密失败：可能密钥不正确');
+        } catch (e) {
+            output('aesOutput', '解密失败：' + e.message);
+        }
+    }
+
+    // ===============================
+    // 🧾 JSON 工具
+    // ===============================
+    function formatJSON() {
+        try {
+            const obj = JSON.parse($('jsonInput').value);
+            output('jsonOutput', JSON.stringify(obj, null, 4));
+        } catch (e) {
+            output('jsonOutput', 'JSON 格式错误: ' + e.message);
+        }
+    }
+    function compressJSON() {
+        try {
+            const obj = JSON.parse($('jsonInput').value);
+            output('jsonOutput', JSON.stringify(obj));
+        } catch (e) {
+            output('jsonOutput', 'JSON 格式错误: ' + e.message);
+        }
+    }
+    function validateJSON() {
+        try {
+            JSON.parse($('jsonInput').value);
+            output('jsonOutput', '✅ JSON 格式正确');
+        } catch (e) {
+            output('jsonOutput', '❌ JSON 格式错误: ' + e.message);
+        }
+    }
+
+    // ===============================
+    // 📊 JSON ↔ CSV 转换
+    // ===============================
+    function jsonToCsv() {
+        try {
+            const data = JSON.parse($('jsonCsvInput').value);
+            if (!Array.isArray(data)) {
+                output('jsonCsvOutput', 'JSON 必须是一个数组');
+                return;
+            }
+
+            if (data.length === 0) {
+                output('jsonCsvOutput', '');
+                return;
+            }
+
+            const headers = Object.keys(data[0]);
+            const csvRows = [headers.join(',')];
+
+            for (const row of data) {
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    return `"${String(value).replace(/"/g, '""')}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            output('jsonCsvOutput', csvRows.join('\n'));
+        } catch (e) {
+            output('jsonCsvOutput', '转换失败: ' + e.message);
+        }
+    }
+
+    function csvToJson() {
+        try {
+            const csv = $('jsonCsvInput').value.trim();
+            const lines = csv.split('\n').filter(line => line.trim());
+            if (lines.length === 0) {
+                output('jsonCsvOutput', '[]');
+                return;
+            }
+
+            const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, ''));
+            const result = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, ''));
+                const obj = {};
+
+                for (let j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = values[j] || '';
+                }
+
+                result.push(obj);
+            }
+
+            output('jsonCsvOutput', JSON.stringify(result, null, 2));
+        } catch (e) {
+            output('jsonCsvOutput', '转换失败: ' + e.message);
+        }
+    }
+
+    // ===============================
+    // 🧮 HTTP 参数解析
+    // ===============================
+    function parseQuery() {
+        const q = $('queryInput').value;
+        // 移除开头的 ? 如果存在
+        const queryString = q.startsWith('?') ? q.substring(1) : q;
+        const params = new URLSearchParams(queryString);
+        const result = {};
+        for (const [k, v] of params) result[k] = v;
+        output('queryOutput', JSON.stringify(result, null, 4));
+    }
+
+    // ===============================
+    // 🔍 正则测试
+    // ===============================
+    function testRegex() {
+        try {
+            const regex = new RegExp($('regexPattern').value);
+            const text = $('regexText').value;
+            const matches = text.match(regex);
+            output('regexOutput', matches ? `匹配到 ${matches.length} 个结果:\n${matches.join('\n')}` : '未匹配到结果');
+        } catch (e) {
+            output('regexOutput', '正则错误: ' + e.message);
+        }
+    }
+
+    // ===============================
+    // 🔑 JWT 解码
+    // ===============================
+    function parseJWT() {
+        const token = $('jwtInput').value.trim();
+        try {
+            const [header, payload] = token.split('.');
+            const h = JSON.parse(atob(header));
+            const p = JSON.parse(atob(payload));
+            output('jwtOutput', JSON.stringify({ header: h, payload: p }, null, 4));
+        } catch (e) {
+            output('jwtOutput', '解析失败: ' + e.message);
+        }
+    }
+
+    // ===============================
+    // 🎨 随机颜色生成
+    // ===============================
+    function generateColor() {
+        const color = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+        output('colorOutput', color);
+        $('colorPreview').style.backgroundColor = color;
+    }
+
+    // ===============================
+    // 🌐 浏览器信息
+    // ===============================
+    function getBrowserInfo() {
+        const info = {
+            '用户代理': navigator.userAgent,
+            '语言': navigator.language,
+            '平台': navigator.platform,
+            'Cookie 启用': navigator.cookieEnabled ? '是' : '否',
+            '在线状态': navigator.onLine ? '在线' : '离线',
+            'Java 启用': navigator.javaEnabled ? '是' : '否',
+            '屏幕分辨率': `${screen.width} × ${screen.height}`,
+            '颜色深度': `${screen.colorDepth} 位`,
+            '视口大小': `${window.innerWidth} × ${window.innerHeight}`
+        };
+
+        let outputText = '';
+        for (const [key, value] of Object.entries(info)) {
+            outputText += `${key}: ${value}\n`;
+        }
+
+        output('browserOutput', outputText);
+    }
+
+    // ===============================
+    // 🧹 文本去重排序
+    // ===============================
+    function removeDuplicateLines() {
+        const lines = $('textCleanInput').value.split('\n').filter(Boolean);
+        const result = Array.from(new Set(lines));
+        output('textCleanOutput', result.join('\n'));
+    }
+    function sortLines() {
+        const lines = $('textCleanInput').value.split('\n').filter(Boolean);
+        const result = lines.sort();
+        output('textCleanOutput', result.join('\n'));
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tool.mapper.TestMapper">
+    <update id="updateMessageLog">
+        UPDATE t_sms_send_log
+        SET result_message = #{errMsg},
+            send_status    = #{sendStatus},
+            send_time      = #{sendTime}
+        WHERE biz_id = #{bizId}
+    </update>
+
+
+    <select id="getAllIccid" resultType="java.lang.String">
+        select iccid
+        from t_simcard_info limit 1000
+    </select>
+</mapper>

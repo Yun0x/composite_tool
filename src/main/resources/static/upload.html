@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>批量更新SIM卡</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f0f2f5;
+        }
+
+        #container {
+            width: 800px;
+            padding: 40px 50px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        #container:hover {
+            transform: translateY(-4px);
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        #dropzone {
+            padding: 60px 20px;
+            border: 3px dashed #4caf50;
+            border-radius: 16px;
+            color: #666;
+            font-size: 1.15rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            background: #f9fff9;
+        }
+        #dropzone.disabled {
+            background: #f0f0f0;
+            border-color: #ccc;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        #dropzone.dragover {
+            background: #e8f5e9;
+            border-color: #388e3c;
+            color: #2e7d32;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) inset;
+        }
+        #dropzone::after {
+            content: "📄";
+            font-size: 2.5rem;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            opacity: 0.2;
+            transition: opacity 0.3s;
+        }
+        #dropzone.dragover::after {
+            opacity: 0.5;
+        }
+
+        #fileInput { display: none; }
+
+        #progressContainer {
+            width: 100%;
+            height: 28px;
+            background: #eee;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-top: 25px;
+            display: none;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #66bb6a, #43a047);
+            transition: width 0.25s ease-in-out;
+        }
+
+        #progressText {
+            margin-top: 12px;
+            font-size: 0.95rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        #statusText {
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: #555;
+            min-height: 20px;
+        }
+
+        #dropzone:hover:not(.disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+        }
+    </style>
+</head>
+<body>
+<div id="container">
+    <h1>批量更新SIM卡</h1>
+    <div id="dropzone">点击或拖拽上传 TXT 文件</div>
+    <input type="file" id="fileInput" accept=".txt">
+
+    <div id="progressContainer">
+        <div id="progressBar"></div>
+    </div>
+    <div id="progressText"></div>
+    <div id="statusText"></div>
+</div>
+
+<script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const statusText = document.getElementById('statusText');
+
+    let uploading = false; // 是否正在上传或解析中
+    function setDropzoneDisabled(state) {
+        uploading = state;
+        if (state) {
+            dropzone.classList.add('disabled');
+        } else {
+            dropzone.classList.remove('disabled');
+        }
+    }
+
+    // 拖拽事件
+    dropzone.addEventListener('dragover', e => {
+        e.preventDefault();
+        if (!uploading) dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', e => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        if (!uploading) handleFile(e.dataTransfer.files[0]);
+    });
+    dropzone.addEventListener('click', () => {
+        if (!uploading) fileInput.click();
+    });
+    fileInput.addEventListener('change', e => {
+        if (!uploading) handleFile(e.target.files[0]);
+        fileInput.value = "";
+    });
+
+    function handleFile(file) {
+        if (!file || !file.name.endsWith('.txt')) {
+            alert('请上传 TXT 文件');
+            return;
+        }
+
+        setDropzoneDisabled(true); // 禁用上传功能
+
+        const formData = new FormData();
+        formData.append("file", file);
+        statusText.textContent = '上传中...';
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        fetch('http://localhost:9001/tool/upload', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code == 200) {
+                    const taskId = data.data;
+                    statusText.textContent = '正在更新中';
+                    const evtSource = new EventSource(`http://localhost:9001/tool/uploadProgressSse?taskId=${taskId}`);
+                    evtSource.addEventListener('progress', function(event) {
+                        const progress = parseInt(event.data.trim());
+                        progressBar.style.width = progress + '%';
+                        progressText.textContent = progress + '%';
+
+                        if (progress >= 100) {
+                            evtSource.close();
+                            statusText.textContent = '上传与解析完成！';
+                            setDropzoneDisabled(false);
+                        }
+                    });
+
+                    evtSource.onerror = function() {
+                        evtSource.close();
+                        statusText.textContent = '进度更新失败';
+                        console.error('SSE 连接中断');
+                        setDropzoneDisabled(false);
+                    };
+
+                } else {
+                    statusText.textContent = '上传失败';
+                    alert('上传失败：' + data.message);
+                    setDropzoneDisabled(false);
+                }
+            })
+            .catch(err => {
+                statusText.textContent = '上传失败';
+                alert('上传失败：' + err);
+                setDropzoneDisabled(false);
+            });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.tool.mapper.UploadMapper">
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO t_simcard_info(iccid, data_refresh_time)
+        VALUES
+        <foreach collection="list" item="item" separator=";">
+            (#{item}, now())
+        </foreach>
+    </insert>
+    <update id="batchUpdate" parameterType="java.util.List">
+        <foreach collection="list" item="item" separator=";">
+            UPDATE t_simcard_info
+            SET
+            msisdn = #{item.msisdn},
+            iccid = #{item.iccid},
+            imsi = #{item.imsi},
+            sp_code = #{item.spCode},
+            carrier = #{item.carrier},
+            data_plan = #{item.dataPlan},
+            data_usage = #{item.dataUsage},
+            account_status = #{item.accountStatus},
+            active = #{item.active},
+            test_used_data_usage = #{item.testUsedDataUsage},
+            data_balance = #{item.dataBalance},
+            support_sms = #{item.supportSms},
+            expiry_date = #{item.expiryDate},
+            test_valid_date = #{item.testValidDate},
+            silent_valid_date = #{item.silentValidDate},
+            active_date = #{item.activeDate},
+            outbound_date = #{item.outboundDate},
+            data_refresh_time = now(),
+            flag1 = #{item.flag1},
+            flag2 = #{item.flag2},
+            flag3 = #{item.flag3}
+            WHERE imsi = #{item.imsi}
+        </foreach>
+    </update>
+
+    <select id="selectNewInfo" parameterType="java.util.List" resultType="com.tool.vo.TSimcardInfo">
+        SELECT *
+        FROM t_simcard_info
+        WHERE 1=0
+        <foreach collection="list" item="item">
+            <if test="item.msisdn != null and item.msisdn != ''">
+                OR msisdn = #{item.msisdn}
+            </if>
+            <if test="item.iccid != null and item.iccid != ''">
+                OR iccid = #{item.iccid}
+            </if>
+        </foreach>
+    </select>
+
+</mapper>

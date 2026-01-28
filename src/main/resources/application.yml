@@ -1,0 +1,21 @@
+server:
+  port: 9001
+
+spring:
+  application:
+    name: tools
+  profiles:
+#    active: prod
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 1000MB
+      max-request-size: 1000MB
+  main:
+    banner-mode: "off"
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.tool.vo
+  configuration:
+    map-underscore-to-camel-case: true

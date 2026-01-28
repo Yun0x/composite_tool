@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>工具</title>
+
+    <!-- 禁止缓存 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <style>
+        html, body { margin:0; padding:0; font-family:sans-serif; }
+        body { display:flex; flex-direction:column; align-items:center; background:#f5f5f5; }
+        h1 { margin-top:20px; }
+        .module-grid {
+            display:grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap:20px;
+            width:90%;
+            max-width:1000px;
+            margin-top:40px;
+        }
+        .module {
+            background:#fff;
+            border-radius:10px;
+            box-shadow:0 2px 6px rgba(0,0,0,0.15);
+            padding:40px 20px;
+            text-align:center;
+            cursor:pointer;
+            transition:all 0.2s;
+            font-size:1.2rem;
+            color:#333;
+        }
+        .module:hover {
+            transform:translateY(-5px);
+            box-shadow:0 6px 12px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+<h1>工具</h1>
+<div class="module-grid">
+    <div class="module" onclick="location.href='upload.html?ts=' + Date.now()">TXT 上传</div>
+    <div class="module" onclick="location.href='fullProcessTool.html?ts=' + Date.now()">一键转换工具</div>
+    <div class="module" onclick="location.href='dtxUtil.html?ts=' + Date.now()">DTX工具</div>
+    <div class="module" onclick="location.href='processMp3.html?ts=' + Date.now()">MP3工具</div>
+<!--    <div class="module" onclick="location.href='tool.html?ts=' + Date.now()">常用工具</div>-->
+</div>
+
+<script>
+    // 页面加载时清空缓存
+    window.addEventListener('load', () => {
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            console.log("✅ 已清空 localStorage 和 sessionStorage");
+        } catch (e) {
+            console.warn("清理缓存失败", e);
+        }
+    });
+</script>
+</body>
+</html>
