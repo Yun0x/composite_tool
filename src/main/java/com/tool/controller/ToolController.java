@@ -1,8 +1,11 @@
 package com.tool.controller;
 
+import com.tool.service.TestService;
 import com.tool.service.UploadService;
 import com.tool.util.DtxUtils;
 import com.tool.util.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -19,6 +22,8 @@ public class ToolController {
 
     @Resource
     private UploadService uploadService;
+    @Autowired
+    private TestService testService;
 
     /**
      * 上传文件，返回 taskId
@@ -179,7 +184,17 @@ public class ToolController {
         }
     }
 
-
+    @GetMapping(
+            value = "/sdCardTest",
+            produces = "text/event-stream;charset=UTF-8"
+    )
+    public SseEmitter sdCardTest(
+            @RequestParam String drivePath,
+            @RequestParam(defaultValue = "1") int rounds,
+            @RequestParam(defaultValue = "true") boolean randomPattern
+    ) {
+        return testService.startSdCardTest(drivePath, rounds, randomPattern);
+    }
 
 
     public static void main(String[] args) {

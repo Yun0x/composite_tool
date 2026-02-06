@@ -376,7 +376,7 @@ public class UploadService {
                         Integer drumNumberByChannel = DtxUtils.getDrumNumberByChannel(channels[i]);
                         drumNumSum += drumNumberByChannel;
                     }
-                    // 将事件加入原始列表，注意：此处一个格子只产生一个事件（多键位叠加）
+                    // 将事件加入原始列表，此处一个格子只产生一个事件（多键位叠加）
                     rawDrumEventList.add(new RawDrumEvent(drumNumSum, currentBeginTime));
                 }
                 // 一行处理完后，起始时间推进

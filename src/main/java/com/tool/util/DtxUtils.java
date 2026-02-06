@@ -703,7 +703,7 @@ public class DtxUtils {
             String two = part.substring(2, 4);
             String third = part.substring(4, 6);
             String four = part.substring(6, 8);
-            System.out.println(part + " " + first + " " + two + " " + third + " " + four + " ");
+//            System.out.println(part + " " + first + " " + two + " " + third + " " + four + " ");
             String newPart;
             if ("02".equals(first) && !"02".equals(third)) {
                 newPart = "02020302";
