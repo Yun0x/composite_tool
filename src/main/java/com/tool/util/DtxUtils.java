@@ -270,11 +270,12 @@ public class DtxUtils {
         }
         String[] split = input.split(": ", 2);
         String drumInfo = split[1];
-        if (drumInfo.length() < 36) {
+        if (drumInfo.length() < 36 && drumInfo.length() != 6 && drumInfo.length() != 12 && drumInfo.length() != 18 && drumInfo.length() != 24 && drumInfo.length() != 30) {
             List<String> chips = new ArrayList<>();
             for (int i = 0; i < drumInfo.length(); i += 2) {
                 chips.add(drumInfo.substring(i, i + 2));
             }
+
             String pad = "";
             switch (chips.size()) {
                 case 1:
@@ -289,64 +290,105 @@ public class DtxUtils {
                 case 8:
                     pad = "02";
                     break;
+                default:
+                    pad = "";
             }
+
             StringBuilder sb = new StringBuilder();
             for (String chip : chips) {
                 sb.append(chip).append(pad);
             }
-            input = split[0] + ": " + sb.toString();
-        } else {
-            List<String> chips = new ArrayList<>();
-            int len = drumInfo.length() / 2;
 
-            if (len == 32) {
-                for (int i = 0; i < drumInfo.length(); i += 4) {
-                    chips.add(drumInfo.substring(i, i + 4));
+            return split[0] + ": " + sb.toString();
+        }
+
+        int len = drumInfo.length() / 2;
+        if (len == 32) {
+            List<String> chips = new ArrayList<>();
+            for (int i = 0; i < drumInfo.length(); i += 4) {
+                chips.add(drumInfo.substring(i, i + 4));
+            }
+
+            for (int i = 0; i < chips.size(); i++) {
+                String chip = chips.get(i);
+                if ("0202".equals(chip)) {
+                    chip = "02";
+                } else {
+                    String left = chip.substring(0, 2);
+                    String right = chip.substring(2, 4);
+                    if ("02".equals(left)) chip = right;
+                    else if ("02".equals(right)) chip = left;
+                    else chip = right;
                 }
-                for (int i = 0; i < chips.size(); i++) {
-                    String chip = chips.get(i);
-                    if (chip.equals("0202")) {
-                        chip = "02";
-                    } else {
-                        String left = chip.substring(0, 2);
-                        String right = chip.substring(2, 4);
-                        if (left.equals("02")) chip = right;
-                        else if (right.equals("02")) chip = left;
-                        else chip = right;
-                    }
-                    chips.set(i, chip);
+                chips.set(i, chip);
+            }
+
+            return input;
+        }
+        if (len == 64) {
+            List<String> chips = new ArrayList<>();
+            for (int i = 0; i < drumInfo.length(); i += 8) {
+                chips.add(drumInfo.substring(i, i + 8));
+            }
+
+            for (int i = 0; i < chips.size(); i++) {
+                String chip = chips.get(i);
+                if ("02020202".equals(chip)) {
+                    chip = "02";
+                } else {
+                    String a = chip.substring(0, 2);
+                    String b = chip.substring(2, 4);
+                    String c = chip.substring(4, 6);
+                    String d = chip.substring(6, 8);
+
+                    if (!"02".equals(a)) chip = a;
+                    else if (!"02".equals(c)) chip = c;
+                    else if (!"02".equals(b)) chip = b;
+                    else if (!"02".equals(d)) chip = d;
+                    else chip = "02";
                 }
-            } else if (len == 64) {
-                for (int i = 0; i < drumInfo.length(); i += 8) {
-                    chips.add(drumInfo.substring(i, i + 8));
-                }
-                for (int i = 0; i < chips.size(); i++) {
-                    String chip = chips.get(i);
-                    if (chip.equals("02020202")) {
-                        chip = "02";
-                    } else {
-                        String leftA = chip.substring(0, 2);
-                        String leftB = chip.substring(2, 4);
-                        String rightA = chip.substring(4, 6);
-                        String rightB = chip.substring(6, 8);
-                        if (!leftA.equals("02")) chip = leftA;
-                        else if (!rightA.equals("02")) chip = rightA;
-                        else if (!leftB.equals("02")) chip = leftB;
-                        else if (!rightB.equals("02")) chip = rightB;
-                        else chip = "02";
-                    }
-                    chips.set(i, chip);
-                }
+                chips.set(i, chip);
+            }
+
+            return input;
+        }
+
+        /* =======================
+         * - 长度不能被 4 整除 → 末尾补 02
+         * - 均分 4 份
+         * - 每份取前两位
+         * - ≠02 → 03020202
+         * - =02 → 02020202
+         * - 固定输出 32 位
+         * ======================= */
+        // 补齐到能被 4 整除
+        StringBuilder drumBuilder = new StringBuilder(drumInfo);
+        while (drumBuilder.length() % 4 != 0) {
+            drumBuilder.append("02");
+        }
+        drumInfo = drumBuilder.toString();
+        paddedDrumInfo(drumInfo);
+        int partLen = drumInfo.length() / 4;
+        StringBuilder result = new StringBuilder(32);
+        for (int i = 0; i < 4; i++) {
+            int start = i * partLen;
+            int end = (i == 3) ? drumInfo.length() : start + partLen;
+            String part = drumInfo.substring(start, end);
+            String head = part.substring(0, 2);
+            if (!"02".equals(head)) {
+                result.append("03020202");
+            } else {
+                result.append("02020202");
             }
         }
-        return input;
+
+        return split[0] + ": " + result.toString();
     }
 
     //获取BPM通道中的对应的值
     public static Integer getBpmIndex(String drumInfo) {
         return getNumberMap(drumInfo) - 2;
     }
-
 
     public static List<String> extractDrumLines(String content) {
         List<String> result = new ArrayList<>();
@@ -643,6 +685,7 @@ public class DtxUtils {
         r3.createCell(6).setCellValue("开始时间 ×100");
         r3.createCell(7).setCellValue("结束时间 ×100");
         r3.createCell(8).setCellValue("控制点");
+        r3.createCell(9).setCellValue("控制点二进制展示");
 
         // =========================
         // 第 4 行起：数据
@@ -664,6 +707,12 @@ public class DtxUtils {
                     read[1].multiply(BigDecimal.valueOf(100)).doubleValue()
             );
             row.createCell(8).setCellValue(read[2].intValue());
+            int value = read[2].intValue();
+            String binary = String.format("%12s", Integer.toBinaryString(value))
+                    .replace(' ', '0');
+            binary = binary.replaceAll("(.{4})", "$1 ").trim();
+            row.createCell(9).setCellValue(binary);
+
         }
 
         for (int i = 0; i <= 8; i++) {
@@ -698,6 +747,7 @@ public class DtxUtils {
         String drumInfo = split[1];
         StringBuilder newDrumInfo = new StringBuilder();
         for (int i = 0; i < 4; i++) {
+            System.out.println(drumInfo);
             String part = drumInfo.substring(i * 8, (i + 1) * 8);
             String first = part.substring(0, 2);
             String two = part.substring(2, 4);

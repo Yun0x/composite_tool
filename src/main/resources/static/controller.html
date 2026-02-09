@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备控制台 - Pro Max版</title>
+    <style>
+        :root {
+            --primary-blue: #007bff;
+            --primary-green: #28a745;
+            --primary-orange: #fd7e14;
+            --primary-red: #ff0000;
+            --primary-purple: #6f42c1;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            /* 保留点阵背景，但在JS中我们会改变底色 */
+            background-image: radial-gradient(#adb5bd 1px, transparent 1px);
+            background-size: 20px 20px;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-color);
+            transition: background-color 0.5s ease; /* 背景色平滑过渡 */
+        }
+
+        /* --- 顶部环境切换器 --- */
+        .env-switcher {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border-radius: 30px;
+            display: flex;
+            position: relative;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            width: 320px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .env-switcher input[type="radio"] {
+            display: none;
+        }
+
+        .env-switcher label {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            z-index: 2;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .env-switcher .slider {
+            position: absolute;
+            height: calc(100% - 10px);
+            width: calc(50% - 5px);
+            background: white;
+            border-radius: 25px;
+            top: 5px;
+            left: 5px;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            z-index: 1;
+        }
+
+        #env_test:checked ~ .slider {
+            transform: translateX(0);
+            background-color: var(--primary-green);
+        }
+
+        #env_test:checked ~ label[for="env_test"] {
+            color: white;
+        }
+
+        #env_prod:checked ~ .slider {
+            transform: translateX(100%);
+            background-color: var(--primary-blue);
+        }
+
+        #env_prod:checked ~ label[for="env_prod"] {
+            color: white;
+        }
+
+        /* 当前 URL 显示 */
+        .current-url-display {
+            font-family: monospace;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- 卡片布局 --- */
+        .container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .card {
+            flex: 1;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            min-width: 300px;
+            max-width: 380px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-header h2 {
+            margin: 0;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+
+        .downloadCMD-panel .card-header h2 {
+            color: var(--primary-blue);
+        }
+
+        .remoteRun-panel .card-header h2 {
+            color: var(--primary-green);
+        }
+
+        .config-panel .card-header h2 {
+            color: var(--primary-purple);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            color: #666;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+
+        /* --- 通用滑动选择器样式 (核心修改) --- */
+        .slide-group {
+            background: #f1f3f5;
+            padding: 4px;
+            border-radius: 8px;
+            display: flex;
+            position: relative;
+            margin-bottom: 5px;
+            border: 1px solid #dee2e6;
+            height: 36px; /* 固定高度 */
+        }
+
+        .slide-group input {
+            display: none;
+        }
+
+        .slide-group label {
+            flex: 1;
+            text-align: center;
+            line-height: 28px; /* 垂直居中 */
+            z-index: 2;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            transition: color 0.3s;
+            margin: 0;
+        }
+
+        /* 选中时文字变白 */
+        .slide-group input:checked + label {
+            color: white;
+        }
+
+        .slide-bar {
+            position: absolute;
+            height: calc(100% - 8px);
+            /* 默认宽度为 1/3，适用于3个选项 */
+            width: calc(33.33% - 6px);
+            border-radius: 6px;
+            top: 4px;
+            left: 4px;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        /* --- 滑块位置逻辑 (3个选项) --- */
+        /* 第1个选中 */
+        .slide-group input:nth-of-type(1):checked ~ .slide-bar {
+            transform: translateX(0);
+        }
+
+        /* 第2个选中 */
+        .slide-group input:nth-of-type(2):checked ~ .slide-bar {
+            transform: translateX(calc(100% + 8px));
+        }
+
+        /* 第3个选中 */
+        .slide-group input:nth-of-type(3):checked ~ .slide-bar {
+            transform: translateX(calc(200% + 16px));
+        }
+
+        /* --- 滑块颜色定义 --- */
+        /* 左侧面板(蓝色) */
+        .downloadCMD-panel .slide-bar {
+            background-color: var(--primary-blue);
+        }
+
+        /* 右侧面板(绿色) */
+        .remoteRun-panel .slide-bar {
+            background-color: var(--primary-green);
+        }
+
+        /* 配置面板(紫色) - 如果需要用到通用类 */
+        .config-panel .slide-bar {
+            background-color: var(--primary-purple);
+        }
+
+        /* 配置面板特定的三档开关特殊颜色逻辑见下方 */
+
+
+        /* --- 自动配置面板特有样式 --- */
+        .mode-tri-switcher {
+            /* 复用通用样式，但为了兼容旧代码ID，这里做特殊处理或直接套用通用类 */
+            background: #f1f3f5;
+            padding: 4px;
+            border-radius: 8px;
+            display: flex;
+            position: relative;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+
+        .mode-tri-switcher input {
+            display: none;
+        }
+
+        .mode-tri-switcher label {
+            flex: 1;
+            text-align: center;
+            padding: 8px 0;
+            z-index: 2;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            transition: color 0.3s;
+        }
+
+        .mode-tri-switcher .slider-tri {
+            position: absolute;
+            height: calc(100% - 8px);
+            width: calc(33.33% - 6px);
+            background: white;
+            border-radius: 6px;
+            top: 4px;
+            left: 4px;
+            transition: left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        /* 快捷预设的特殊颜色逻辑 */
+        #mode_traffic:checked ~ .slider-tri {
+            left: 4px;
+            background: var(--primary-purple);
+        }
+
+        #mode_traffic:checked ~ label[for="mode_traffic"] {
+            color: white;
+        }
+
+        #mode_off:checked ~ .slider-tri {
+            left: calc(33.33% + 2px);
+            background: var(--primary-red);
+        }
+
+        /* 关闭用红色警示 */
+        #mode_off:checked ~ label[for="mode_off"] {
+            color: white;
+        }
+
+        #mode_always:checked ~ .slider-tri {
+            left: calc(66.66%);
+            background: var(--primary-purple);
+        }
+
+        #mode_always:checked ~ label[for="mode_always"] {
+            color: white;
+        }
+
+
+        /* 阶段行样式 */
+        .stage-row {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .stage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .stage-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-round {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider-round:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider-round {
+            background-color: var(--primary-purple);
+        }
+
+        input:checked + .slider-round:before {
+            transform: translateX(16px);
+        }
+
+        .stage-inputs {
+            display: flex;
+            gap: 5px;
+            transition: max-height 0.3s ease-out, opacity 0.3s;
+            overflow: hidden;
+            max-height: 50px;
+            opacity: 1;
+        }
+
+        .stage-inputs.hidden {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .input-wrap {
+            flex: 1;
+        }
+
+        .input-wrap input {
+            text-align: center;
+            padding: 6px;
+            font-size: 12px;
+        }
+
+        .input-label {
+            font-size: 10px;
+            text-align: center;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        /* 按钮通用 */
+        .action-btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: opacity 0.3s;
+        }
+
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+
+        .downloadCMD-panel .action-btn {
+            background-color: var(--primary-blue);
+        }
+
+        .remoteRun-panel .action-btn {
+            background-color: var(--primary-green);
+        }
+
+        .config-panel .action-btn {
+            background-color: var(--primary-purple);
+        }
+
+        #notify-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .notify {
+            min-width: 260px;
+            max-width: 360px;
+            padding: 14px 18px;
+            border-radius: 14px;
+            color: #fff;
+            font-size: 14px;
+            line-height: 1.5;
+            backdrop-filter: blur(14px);
+            background: linear-gradient(
+                    135deg,
+                    rgba(40, 167, 69, 0.95),
+                    rgba(25, 135, 84, 0.9)
+            );
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+            transform: translateX(120%);
+            opacity: 0;
+            animation: slideIn 0.5s cubic-bezier(.22, 1.2, .36, 1) forwards;
+        }
+
+        .notify.error {
+            background: linear-gradient(
+                    135deg,
+                    rgba(220, 53, 69, 0.95),
+                    rgba(176, 42, 55, 0.9)
+            );
+        }
+
+        .notify.info {
+            background: linear-gradient(
+                    135deg,
+                    rgba(0, 123, 255, 0.95),
+                    rgba(0, 86, 179, 0.9)
+            );
+        }
+
+        .notify::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: linear-gradient(
+                    120deg,
+                    rgba(255, 255, 255, 0.15),
+                    rgba(255, 255, 255, 0)
+            );
+            pointer-events: none;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(120%) scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            to {
+                transform: translateX(120%) scale(0.9);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="notify-container"></div>
+<div class="env-switcher">
+    <input type="radio" id="env_test" name="env_select" value="test" onchange="updateEnvDisplay()">
+    <label for="env_test">测试环境</label>
+    <input type="radio" id="env_prod" name="env_select" value="prod" checked onchange="updateEnvDisplay()">
+    <label for="env_prod">线上环境</label>
+    <div class="slider"></div>
+</div>
+
+<div id="url_display" class="current-url-display">
+    当前 API: http://192.168.1.7:9090/drum/app/drum
+</div>
+
+<div class="container">
+    <div class="card remoteRun-panel">
+        <div class="card-header"><h2>远程启动</h2></div>
+        <div class="form-group">
+            <label>机器编号</label>
+            <input type="text" id="rb_machine" value="13600004">
+        </div>
+        <div class="form-group">
+            <label>难度等级</label>
+            <div class="slide-group">
+                <input type="radio" id="rb_lvl1" name="rb_level" value="1">
+                <label for="rb_lvl1">Lv1</label>
+
+                <input type="radio" id="rb_lvl2" name="rb_level" value="2">
+                <label for="rb_lvl2">Lv2</label>
+
+                <input type="radio" id="rb_lvl3" name="rb_level" value="3" checked>
+                <label for="rb_lvl3">Lv3</label>
+
+                <div class="slide-bar"></div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>歌曲编号</label>
+            <input type="number" id="rb_song" placeholder="如: 1">
+        </div>
+        <button class="action-btn" onclick="sendRemoteBoot()">启动设备</button>
+    </div>
+
+    <div class="card downloadCMD-panel">
+        <div class="card-header"><h2>发送下载指令</h2></div>
+
+        <div class="form-group">
+            <label>机器编号</label>
+            <input type="text" id="dl_machine" value="13600004">
+        </div>
+
+        <div class="form-group">
+            <label>下载类型</label>
+            <div class="slide-group">
+                <input type="radio" id="type2" name="dl_type" value="2" checked>
+                <label for="type2">完整</label>
+
+                <input type="radio" id="type4" name="dl_type" value="4">
+                <label for="type4">单曲</label>
+
+                <input type="radio" id="type5" name="dl_type" value="5">
+                <label for="type5">单Bin</label>
+
+                <div class="slide-bar"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>难度等级</label>
+            <div class="slide-group">
+                <input type="radio" id="dl_lvl1" name="dl_level" value="1">
+                <label for="dl_lvl1">Lv1</label>
+
+                <input type="radio" id="dl_lvl2" name="dl_level" value="2">
+                <label for="dl_lvl2">Lv2</label>
+
+                <input type="radio" id="dl_lvl3" name="dl_level" value="3" checked>
+                <label for="dl_lvl3">Lv3</label>
+
+                <div class="slide-bar"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>歌曲编号</label>
+            <input type="number" id="dl_song" placeholder="如: 3">
+        </div>
+        <button class="action-btn" onclick="sendDownload()">发送指令</button>
+    </div>
+
+    <div class="card config-panel">
+        <div class="card-header"><h2>自动运行配置</h2></div>
+
+        <div class="form-group">
+            <label>机器编号</label>
+            <input type="text" id="cfg_machine" value="13600004">
+        </div>
+
+        <div class="form-group">
+            <label>快捷预设</label>
+            <div class="mode-tri-switcher">
+                <input type="radio" id="mode_traffic" name="quick_mode" value="traffic" checked
+                       onchange="applyPreset('traffic')">
+                <label for="mode_traffic">引流模式</label>
+
+                <input type="radio" id="mode_off" name="quick_mode" value="off" onchange="applyPreset('off')">
+                <label for="mode_off">关闭</label>
+
+                <input type="radio" id="mode_always" name="quick_mode" value="always" onchange="applyPreset('always')">
+                <label for="mode_always">常亮模式</label>
+
+                <div class="slider-tri"></div>
+            </div>
+        </div>
+
+        <div class="stage-row">
+            <div class="stage-header">
+                <span class="stage-title">第一阶段 (引流)</span>
+                <label class="switch">
+                    <input type="checkbox" id="sw_1" checked onchange="toggleInputs(1)">
+                    <span class="slider-round"></span>
+                </label>
+            </div>
+            <div class="stage-inputs" id="inputs_1">
+                <div class="input-wrap"><input type="number" id="ts_1" value="1">
+                    <div class="input-label">开始(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="te_1" value="12">
+                    <div class="input-label">结束(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="int_1" value="1">
+                    <div class="input-label">持续</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stage-row">
+            <div class="stage-header">
+                <span class="stage-title">第二阶段 (引流)</span>
+                <label class="switch">
+                    <input type="checkbox" id="sw_2" checked onchange="toggleInputs(2)">
+                    <span class="slider-round"></span>
+                </label>
+            </div>
+            <div class="stage-inputs" id="inputs_2">
+                <div class="input-wrap"><input type="number" id="ts_2" value="12">
+                    <div class="input-label">开始(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="te_2" value="23">
+                    <div class="input-label">结束(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="int_2" value="1">
+                    <div class="input-label">持续</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stage-row">
+            <div class="stage-header">
+                <span class="stage-title">第三阶段 (常亮)</span>
+                <label class="switch">
+                    <input type="checkbox" id="sw_3" onchange="toggleInputs(3)">
+                    <span class="slider-round"></span>
+                </label>
+            </div>
+            <div class="stage-inputs hidden" id="inputs_3">
+                <div class="input-wrap"><input type="number" id="ts_3" value="0">
+                    <div class="input-label">开始(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="te_3" value="0">
+                    <div class="input-label">结束(H)</div>
+                </div>
+                <div class="input-wrap"><input type="number" id="int_3" value="0">
+                    <div class="input-label">持续</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="action-btn" onclick="sendConfig()">保存配置</button>
+    </div>
+
+
+</div>
+
+<script>
+    const ENV_URLS = {
+        test: "http://192.168.1.7:9090/drum/app/drum",
+        prod: "https://drum.nh-elec.cn/app/drum",
+    };
+
+    function getCurrentBaseUrl() {
+        const env = document.querySelector('input[name="env_select"]:checked').value;
+        return ENV_URLS[env];
+    }
+
+    /**
+     * 更新显示并调整背景色
+     */
+    function updateEnvDisplay() {
+        const envRadio = document.querySelector('input[name="env_select"]:checked');
+        const env = envRadio.value;
+        notify(`切换到${env === 'test' ? "测试环境" : "正式环境"}`, {...(env === 'prod' ? { type: 'info' } : {}), duration: 1500});
+        const url = ENV_URLS[env];
+        const displayDiv = document.getElementById('url_display');
+        displayDiv.innerText = "当前: " + url;
+        displayDiv.style.opacity = '0.5';
+        setTimeout(() => displayDiv.style.opacity = '1', 200);
+        if (env === 'test') {
+            document.body.style.backgroundColor = 'rgba(40, 167, 69, 0.15)'; // 绿色背景
+        } else {
+            document.body.style.backgroundColor = 'rgba(0, 123, 255, 0.15)'; // 蓝色背景
+        }
+    }
+
+    function formatSongNum(num) {
+        if (!num) return "S00000";
+        return "S" + String(num).padStart(5, '0');
+    }
+
+    function executeRequest(fullUrl, envName) {
+        notify("发送成功")
+        fetch(fullUrl, {
+            method: 'GET',
+            mode: 'no-cors'
+        }).catch(() => {
+            notify("发送成功",{type: "error", duration: 1500})
+        });
+    }
+
+    function toggleInputs(id) {
+        const checkbox = document.getElementById(`sw_${id}`);
+        const inputsDiv = document.getElementById(`inputs_${id}`);
+        if (checkbox.checked) {
+            inputsDiv.classList.remove('hidden');
+        } else {
+            inputsDiv.classList.add('hidden');
+        }
+    }
+    function applyPreset(mode) {
+        const sw1 = document.getElementById('sw_1');
+        const sw2 = document.getElementById('sw_2');
+        const sw3 = document.getElementById('sw_3');
+
+        const setVal = (id, s, e, i) => {
+            document.getElementById(`ts_${id}`).value = s;
+            document.getElementById(`te_${id}`).value = e;
+            document.getElementById(`int_${id}`).value = i;
+        };
+
+        if (mode === 'traffic') { // 引流模式
+            sw1.checked = true;
+            setVal(1, 1, 12, 1);
+            sw2.checked = true;
+            setVal(2, 12, 23, 1);
+            sw3.checked = false;
+            setVal(3, 0, 0, 0);
+        } else if (mode === 'off') { // 关闭
+            sw1.checked = false;
+            setVal(1, 0, 0, 0);
+            sw2.checked = false;
+            setVal(2, 0, 0, 0);
+            sw3.checked = false;
+            setVal(3, 0, 0, 0);
+        } else if (mode === 'always') { // 常亮模式
+            sw1.checked = false;
+            setVal(1, 0, 0, 0);
+            sw2.checked = false;
+            setVal(2, 0, 0, 0);
+            sw3.checked = true;
+            setVal(3, 1, 24, 0);
+        }
+        toggleInputs(1);
+        toggleInputs(2);
+        toggleInputs(3);
+    }
+
+    function sendConfig() {
+        const baseUrl = getCurrentBaseUrl();
+        const machine = document.getElementById('cfg_machine').value;
+        const envName = document.querySelector('input[name="env_select"]:checked').nextElementSibling.innerText;
+        let params = `machineNo=${machine}`;
+        for (let i = 1; i <= 3; i++) {
+            const ts = document.getElementById(`ts_${i}`).value;
+            const te = document.getElementById(`te_${i}`).value;
+            const int = document.getElementById(`int_${i}`).value;
+            params += `&timeStart${i}=${ts}&timeEnd${i}=${te}&interval${i}=${int}`;
+        }
+        executeRequest(`${baseUrl}/setAutoRunConfig?${params}`, envName);
+    }
+
+    function sendDownload() {
+        const baseUrl = getCurrentBaseUrl();
+        const type = document.querySelector('input[name="dl_type"]:checked').value;
+        const machine = document.getElementById('dl_machine').value;
+        const level = document.querySelector('input[name="dl_level"]:checked').value;
+        const songRaw = document.getElementById('dl_song').value;
+        const envName = document.querySelector('input[name="env_select"]:checked').nextElementSibling.innerText;
+
+        if (!songRaw) {
+            alert("请输入歌曲编号");
+            return;
+        }
+        const url = `${baseUrl}/sendTest?type=${type}&machineNo=${machine}&level=${level}&songNum=${formatSongNum(songRaw)}`;
+        executeRequest(url, envName);
+    }
+
+    function sendRemoteBoot() {
+        const baseUrl = getCurrentBaseUrl();
+        const machine = document.getElementById('rb_machine').value;
+        const level = document.querySelector('input[name="rb_level"]:checked').value;
+        const songRaw = document.getElementById('rb_song').value;
+        const envName = document.querySelector('input[name="env_select"]:checked').nextElementSibling.innerText;
+
+        if (!songRaw) {
+            alert("请输入歌曲编号");
+            return;
+        }
+        const url = `${baseUrl}/remoteBoot?machineNo=${machine}&songNum=${formatSongNum(songRaw)}&level=${level}`;
+        executeRequest(url, envName);
+    }
+
+    function notify(message, options = {}) {
+        const {
+            type = 'success',
+            duration = 1000
+        } = options;
+        const container = document.getElementById('notify-container');
+        if (!container) return;
+        const el = document.createElement('div');
+        el.className = `notify ${type}`;
+        el.innerHTML = message;
+        container.appendChild(el);
+        setTimeout(() => {
+            el.style.animation = 'slideOut 0.4s ease forwards';
+            el.addEventListener('animationend', () => el.remove());
+        }, duration);
+    }
+
+    updateEnvDisplay();
+    applyPreset('traffic');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鼓机文件一键复制</title>
+    <style>
+        /* 全局美化 */
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-gradient);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #2d3748;
+        }
+
+        /* 卡片设计：毛玻璃效果 */
+        .card {
+            width: 100%;
+            max-width: 650px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+            padding: 40px;
+            box-sizing: border-box;
+            transform: translateY(0);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* 标题美化 */
+        .card-header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            background: var(--bg-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .sub-title {
+            color: #718096;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        /* 输入区域布局 */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f7fafc;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid #edf2f7;
+            transition: var(--transition);
+        }
+
+        .row:focus-within {
+            background: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        /* 输入框去边框化 */
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            font-size: 15px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: #4a5568;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* 渐变按钮 */
+        button {
+            padding: 12px 28px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            background: var(--bg-gradient);
+            color: #fff;
+            white-space: nowrap;
+            transition: var(--transition);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 6px 18px rgba(102, 126, 234, 0.5);
+        }
+
+        button:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background: #cbd5e0;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* 状态反馈设计 */
+        #result {
+            margin-top: 25px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .success {
+            background: #f0fff4;
+            color: #2f855a;
+            border-left: 5px solid #48bb78;
+        }
+
+        .error {
+            background: #fff5f5;
+            color: #c53030;
+            border-left: 5px solid #f56565;
+        }
+
+        .loading {
+            background: #ebf8ff;
+            color: #2b6cb0;
+            border-left: 5px solid #4299e1;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 加载动画小圆点 */
+        .loading::after {
+            content: "";
+            width: 12px;
+            height: 12px;
+            border: 2px solid #2b6cb0;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="card-header">
+        <h2>鼓机文件一键复制</h2>
+        <p class="sub-title">请输入源目录路径，系统将自动处理分发</p>
+    </div>
+
+    <div class="input-group">
+        <div class="row">
+            <input
+                    id="pathInput"
+                    type="text"
+                    spellcheck="false"
+                    value="D:\Document\drumFiles\正式歌曲\result"
+            />
+            <button id="copyBtn">开始复制</button>
+        </div>
+    </div>
+
+    <div id="result" class="loading"></div>
+</div>
+
+<script>
+    const copyBtn = document.getElementById('copyBtn');
+    const pathInput = document.getElementById('pathInput');
+    const resultDiv = document.getElementById('result');
+
+    function showResult(message, type) {
+        resultDiv.className = '';
+        resultDiv.classList.add(type);
+        resultDiv.textContent = message;
+        resultDiv.style.display = 'flex';
+        if (type === 'success') resultDiv.textContent = '✔ ' + message;
+        if (type === 'error') resultDiv.textContent = '✘ ' + message;
+    }
+
+    copyBtn.addEventListener('click', () => {
+        const path = pathInput.value.trim();
+        if (!path) {
+            showResult('请输入源目录路径', 'error');
+            return;
+        }
+
+        copyBtn.disabled = true;
+        showResult('正在复制文件，请稍候...', 'loading');
+
+        fetch('/tool/copyDrumFiles', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'path=' + encodeURIComponent(path)
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 200) {
+                    showResult(data.message, 'success');
+                } else {
+                    showResult(data.message || '操作失败', 'error');
+                }
+                copyBtn.disabled = false;
+            })
+            .catch(err => {
+                showResult('请求异常：' + err, 'error');
+                copyBtn.disabled = false;
+            });
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>SD 卡整盘校验</title>
+    <style>
+        body {
+            font-family: "Consolas", "Monaco", monospace;
+            background: #0f172a;
+            color: #e5e7eb;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+        }
+        .panel {
+            background: #020617;
+            border-radius: 12px;
+            padding: 30px 40px;
+            width: 900px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.7);
+        }
+        h1 {
+            margin-bottom: 25px;
+            font-size: 28px;
+            text-align: center;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        label {
+            width: 160px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        input, select {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: none;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            margin-left: 10px;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .progress-container {
+            width: 100%;
+            background: #1e293b;
+            border-radius: 6px;
+            height: 32px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+        .status {
+            margin-top: 12px;
+            font-size: 16px;
+            color: #93c5fd;
+        }
+        .output {
+            margin-top: 20px;
+            background: #111827;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
+        .speed {
+            margin-top: 8px;
+            font-size: 16px;
+            color: #facc15;
+        }
+    </style>
+</head>
+<body>
+
+<div class="panel">
+    <h1>SD 卡整盘校验</h1>
+
+    <div class="row">
+        <label>盘符 / 路径</label>
+        <input id="drivePath" value="E:\" />
+    </div>
+
+    <div class="row">
+        <label>覆盖轮数</label>
+        <input id="rounds" type="number" min="1" value="1" />
+    </div>
+
+    <div class="row">
+        <label>随机 Pattern</label>
+        <select id="randomPattern">
+            <option value="true">是</option>
+            <option value="false">否</option>
+        </select>
+    </div>
+
+    <div class="row">
+        <button id="startBtn" onclick="startTest()">开始校验</button>
+        <button onclick="stopTest()">断开</button>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="status" id="status">等待开始...</div>
+    <div class="speed" id="speed">速度: 0 MB/s</div>
+    <div class="output" id="output">等待开始...</div>
+</div>
+
+<script>
+    let eventSource = null;
+
+    function startTest() {
+        const drivePath = encodeURIComponent(document.getElementById("drivePath").value);
+        const rounds = document.getElementById("rounds").value;
+        const randomPattern = document.getElementById("randomPattern").value;
+
+        if (eventSource) eventSource.close();
+
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("status").textContent = "连接中...";
+        document.getElementById("output").textContent = "";
+        document.getElementById("progressBar").style.width = '0%';
+        document.getElementById("speed").textContent = "速度: 0 MB/s";
+
+        const url = `/tool/sdCardTest?drivePath=${drivePath}&rounds=${rounds}&randomPattern=${randomPattern}`;
+        eventSource = new EventSource(url);
+
+        eventSource.onmessage = function(event) {
+            const data = event.data;
+
+            // 输出到日志区域
+            document.getElementById("output").textContent = data;
+
+            // 解析后端输出
+            const match = data.match(/([0-9.]+)%.*轮次：([0-9]+).*已校验：([0-9.]+)([KMGT]?B).*错误块数：([0-9]+).*速度：([0-9.]+) MB\/s/);
+            if(match){
+                const percent = parseFloat(match[1]);
+                const speed = parseFloat(match[6]);
+
+                // 更新进度条
+                document.getElementById("progressBar").style.width = percent + '%';
+                document.getElementById("speed").textContent = "速度: " + speed.toFixed(2) + " MB/s";
+            }
+
+            document.getElementById("status").textContent = "运行中...";
+        };
+
+        eventSource.onerror = function() {
+            document.getElementById("status").textContent = "已停止或断开";
+            document.getElementById("startBtn").disabled = false;
+            if(eventSource) eventSource.close();
+        };
+    }
+
+    function stopTest() {
+        if(eventSource){
+            eventSource.close();
+            eventSource = null;
+            document.getElementById("status").textContent = "已手动断开";
+            document.getElementById("startBtn").disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>

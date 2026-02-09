@@ -184,10 +184,7 @@ public class ToolController {
         }
     }
 
-    @GetMapping(
-            value = "/sdCardTest",
-            produces = "text/event-stream;charset=UTF-8"
-    )
+    @GetMapping(value = "/sdCardTest", produces = "text/event-stream;charset=UTF-8")
     public SseEmitter sdCardTest(
             @RequestParam String drivePath,
             @RequestParam(defaultValue = "1") int rounds,
@@ -196,6 +193,18 @@ public class ToolController {
         return testService.startSdCardTest(drivePath, rounds, randomPattern);
     }
 
+    @PostMapping(value = "/wipeSdCard")
+    public SseEmitter wipeSdCard(@RequestParam Integer type) {
+        return testService.wipeSdCard(type);
+    }
+
+
+
+
+    @PostMapping("/copyDrumFiles")
+    public Result copyDrumFiles(@RequestParam String path) {
+        return testService.copyDrumFiles(path);
+    }
 
     public static void main(String[] args) {
         String a = "02020202020202023202020202020202";

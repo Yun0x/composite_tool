@@ -2,76 +2,193 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>工具</title>
+    <title>工作流工具箱</title>
 
-    <!-- 禁止缓存 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
     <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            font-family: sans-serif;
+        :root {
+            --bg-color: #f0f2f5;
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-hover-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
 
         body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(#d1d5db 1px, transparent 1px);
+            background-size: 20px 20px; /* 背景点状纹理 */
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            padding: 40px 0;
+            text-align: center;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 40px;
         }
 
         h1 {
-            margin-top: 20px;
+            margin: 0;
+            font-size: 2.2rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+            font-weight: 800;
         }
 
-        .module-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+        .container {
             width: 90%;
-            max-width: 1000px;
-            margin-top: 40px;
+            max-width: 1100px;
+            display: grid;
+            /* 定义布局网格 */
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: minmax(160px, auto);
+            gap: 20px;
+            padding-bottom: 50px;
         }
 
+        /* 通用卡片样式 */
         .module {
             background: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-            padding: 40px 20px;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.2rem;
-            color: #333;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
         }
 
         .module:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            transform: translateY(-8px);
+            box-shadow: var(--card-hover-shadow);
+            border-color: #ff0000;
+        }
+
+        .module i {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            transition: transform 0.3s;
+        }
+
+        .module:hover i {
+            transform: scale(1.1);
+        }
+
+        .module-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #2d3748;
+        }
+
+        /* 核心逻辑：将这四个工具排在一行 (占据 4 列) */
+        .row-focus {
+            grid-column: span 1;
+            background: linear-gradient(to bottom right, #ffffff, #f9faff);
+        }
+
+        .color-1 { color: #4f46e5; border-bottom: 4px solid #4f46e5; } /* 复制 */
+        .color-2 { color: #f59e0b; border-bottom: 4px solid #f59e0b; } /* 转换 */
+        .color-3 { color: #10b981; border-bottom: 4px solid #10b981; } /* DTX */
+        .color-4 { color: #ec4899; border-bottom: 4px solid #ec4899; } /* MP3 */
+
+        .module.secondary {
+            grid-column: span 1;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.8);
+        }
+
+        .module.wide {
+            grid-column: span 2;
+        }
+
+        .module::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 40px;
+            height: 40px;
+            background: currentColor;
+            opacity: 0.05;
+            border-radius: 50%;
+        }
+
+        @media (max-width: 850px) {
+            .container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .module.wide {
+                grid-column: span 2;
+            }
         }
     </style>
 </head>
 <body>
-<h1>工具</h1>
-<div class="module-grid">
-    <div class="module" onclick="location.href='sdCardTest.html?ts=' + Date.now()">sd卡检测</div>
-    <div class="module" onclick="location.href='upload.html?ts=' + Date.now()">TXT 上传</div>
-    <div class="module" onclick="location.href='fullProcessTool.html?ts=' + Date.now()">一键转换工具</div>
-    <div class="module" onclick="location.href='dtxUtil.html?ts=' + Date.now()">DTX工具</div>
-    <div class="module" onclick="location.href='processMp3.html?ts=' + Date.now()">MP3工具</div>
-    <!--    <div class="module" onclick="location.href='tool.html?ts=' + Date.now()">常用工具</div>-->
+
+<header>
+    <h1>小工具控制台</h1>
+</header>
+
+<div class="container">
+    <div class="module secondary" onclick="navigate('sdCardTest.html')">
+        <span style="font-size: 2rem">💾</span>
+        <div class="module-title">SD卡检测</div>
+    </div>
+    <div class="module secondary" onclick="navigate('upload.html')">
+        <span style="font-size: 2rem">📄</span>
+        <div class="module-title">TXT 上传</div>
+    </div>
+    <div class="module wide secondary" onclick="navigate('controller.html')">
+        <span style="font-size: 2rem">⚙️</span>
+        <div class="module-title">测试启动下载工具</div>
+    </div>
+
+    <div class="module row-focus color-1" onclick="navigate('copyDrumFiles.html')">
+        <span style="font-size: 2.5rem">📂</span>
+        <div class="module-title">快速复制音乐文件</div>
+    </div>
+    <div class="module row-focus color-2" onclick="navigate('fullProcessTool.html')">
+        <span style="font-size: 2.5rem">⚡</span>
+        <div class="module-title">一键转换工具</div>
+    </div>
+    <div class="module row-focus color-3" onclick="navigate('dtxUtil.html')">
+        <span style="font-size: 2.5rem">🥁</span>
+        <div class="module-title">DTX 工具</div>
+    </div>
+    <div class="module row-focus color-4" onclick="navigate('processMp3.html')">
+        <span style="font-size: 2.5rem">🎵</span>
+        <div class="module-title">MP3 工具</div>
+    </div>
 </div>
 
 <script>
+    function navigate(url) {
+        location.href = url + '?ts=' + Date.now();
+    }
+
     // 页面加载时清空缓存
     window.addEventListener('load', () => {
         try {
             localStorage.clear();
             sessionStorage.clear();
-            console.log("✅ 已清空 localStorage 和 sessionStorage");
+            console.log("已清空 localStorage 和 sessionStorage");
         } catch (e) {
             console.warn("清理缓存失败", e);
         }
