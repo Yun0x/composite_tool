@@ -466,14 +466,114 @@ public class DtxUtils {
         return newDrumList;
     }
 
-    /**
-     * @Description： 将鼓点长度固定，变为16位
-     * 例如03，则转换为03020202020202020202020202020202
-     * 例如0303，转换为03020202020202020302020202020202
-     * 例如03020203，则转换为03020202020202020202020203020202
-     * @author Lachesism
-     * @date 2025-12-29
-     */
+    public static List<String> genHammerDtxInfo(List<List<String>> sourceDrumInfoList) {
+        if (sourceDrumInfoList == null || sourceDrumInfoList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<String> resultList = new ArrayList<>();
+        int size = sourceDrumInfoList.size();
+        for (int i = 0; i < size; i += 3) {
+            int end = Math.min(i + 3, size);
+            List<List<String>> batch = sourceDrumInfoList.subList(i, end);
+            processBatchBalance(batch);
+            for (List<String> subList : batch) {
+                resultList.addAll(subList);
+            }
+        }
+        return resultList;
+    }
+
+
+    private static void processBatchBalance(List<List<String>> batch) {
+        int sectionCount = batch.size();
+        int channelCount = 11; // 1个18 + 10个通道
+
+        // 1. 将数据解析为易操作的数组: [小节][通道][节拍]
+        // beatsData[s][c][p] -> s:0-2小节, c:0-10通道, p:0-15节拍
+        String[][][] beatsData = new String[sectionCount][channelCount][16];
+        String[][] prefixData = new String[sectionCount][channelCount]; // 存储 "07718: " 这种前缀
+
+        for (int s = 0; s < sectionCount; s++) {
+            List<String> section = batch.get(s);
+            for (int c = 0; c < channelCount; c++) {
+                String line = section.get(c);
+                String[] parts = line.split(": ");
+                prefixData[s][c] = parts[0] + ": ";
+                String hexData = parts[1].trim();
+                for (int p = 0; p < 16; p++) {
+                    beatsData[s][c][p] = hexData.substring(p * 2, p * 2 + 2);
+                }
+            }
+        }
+
+        for (int c = 1; c < channelCount; c++) {
+            if (isChannelEmptyInBatch(beatsData, c, sectionCount)) {
+                tryBorrowHit(beatsData, c, sectionCount);
+            }
+        }
+
+        for (int s = 0; s < sectionCount; s++) {
+            List<String> section = batch.get(s);
+            for (int c = 0; c < channelCount; c++) {
+                StringBuilder sb = new StringBuilder(prefixData[s][c]);
+                for (int p = 0; p < 16; p++) {
+                    sb.append(beatsData[s][c][p]);
+                }
+                section.set(c, sb.toString());
+            }
+        }
+    }
+
+    // 判断某个通道在这一组小节中是否完全没有 03
+    private static boolean isChannelEmptyInBatch(String[][][] data, int channelIdx, int sectionCount) {
+        for (int s = 0; s < sectionCount; s++) {
+            for (int p = 0; p < 16; p++) {
+                if ("03".equals(data[s][channelIdx][p])) return false;
+            }
+        }
+        return true;
+    }
+
+    // 移位逻辑：从有连续 03 的通道借调
+    private static void tryBorrowHit(String[][][] data, int targetChannelIdx, int sectionCount) {
+        for (int s = 0; s < sectionCount; s++) {
+            for (int sourceC = 1; sourceC < 11; sourceC++) {
+                if (sourceC == targetChannelIdx) continue;
+
+                for (int p = 0; p < 15; p++) {
+                    // 查找连续的 03 (例如 p 和 p+1 都是 03)
+                    if ("03".equals(data[s][sourceC][p]) && "03".equals(data[s][sourceC][p + 1])) {
+                        // 发现连续敲击，执行移位
+                        data[s][sourceC][p + 1] = "02";  // 源通道对应位置变 02
+                        data[s][targetChannelIdx][p + 1] = "03"; // 死通道对应位置变 03
+                        return; // 一个死通道借到一个 03 即可平衡，跳出
+                    }
+                }
+            }
+        }
+
+        // 兜底逻辑：如果没有连续的 03，就借用任何一个 03
+        for (int s = 0; s < sectionCount; s++) {
+            for (int sourceC = 1; sourceC < 11; sourceC++) {
+                if (sourceC == targetChannelIdx) continue;
+                for (int p = 0; p < 16; p++) {
+                    if ("03".equals(data[s][sourceC][p])) {
+                        data[s][sourceC][p] = "02";
+                        data[s][targetChannelIdx][p] = "03";
+                        return;
+                    }
+                }
+            }
+        }
+    }
+        /**
+         * @Description： 将鼓点长度固定，变为16位
+         * 例如03，则转换为03020202020202020202020202020202
+         * 例如0303，转换为03020202020202020302020202020202
+         * 例如03020203，则转换为03020202020202020202020203020202
+         * @author Lachesism
+         * @date 2025-12-29
+         */
 
     public static List<String> reGroupDrumInfo(List<List<String>> grouped) {
         List<String> newDrumList = new ArrayList<>();
@@ -504,6 +604,38 @@ public class DtxUtils {
             }
         }
         return newDrumList;
+    }
+    public static List<List<String>> reGroupHammerDrumInfo(List<List<String>> grouped) {
+        List<List<String>> newGroupedDrumList = new ArrayList<>();
+        if (grouped == null || grouped.isEmpty()) {
+            return newGroupedDrumList;
+        }
+        for (List<String> channelGroupDrum : grouped) {
+            if (channelGroupDrum.isEmpty()) continue;
+            List<List<String>> chipsList = new ArrayList<>();
+            for (String drum : channelGroupDrum) {
+                String[] parts = drum.split(":");
+                String drumData = parts.length > 1 ? parts[1].trim() : "";
+                List<String> chips = new ArrayList<>();
+                for (int i = 0; i < drumData.length(); i += 2) {
+                    if (i + 2 <= drumData.length()) {
+                        chips.add(drumData.substring(i, i + 2));
+                    }
+                }
+                chipsList.add(chips);
+            }
+            int chipCount = chipsList.stream().mapToInt(List::size).min().orElse(0);
+            List<String> regroupedChannel = new ArrayList<>();
+            for (int i = 0; i < chipCount; i++) {
+                StringBuilder sb = new StringBuilder();
+                for (List<String> chips : chipsList) {
+                    sb.append(chips.get(i));
+                }
+                regroupedChannel.add(sb.toString());
+            }
+            newGroupedDrumList.add(regroupedChannel);
+        }
+        return newGroupedDrumList;
     }
 
     /**
@@ -828,4 +960,35 @@ public class DtxUtils {
             fos.write(content.getBytes(StandardCharsets.UTF_8));
         }
     }
+
+
+    public static int randomByWeight() {
+        int r = ThreadLocalRandom.current().nextInt(120); // 0~119
+        if (r < 50) {          // 0~49 → 50/120 ≈ 41.7%
+            return 1;
+        } else if (r < 90) {   // 50~89 → 40/120 ≈ 33.3%
+            return 2;
+        } else {               // 90~119 → 30/120 = 25%
+            return 3;
+        }
+    }
+
+
+    public static int getRandomHexSum(int count) {
+        int maxValue = 10;
+        if (count > maxValue + 1) {
+            throw new IllegalArgumentException("count 不能大于 11");
+        }
+        List<Integer> numbers = new ArrayList<>();
+        for (int i = 0; i <= maxValue; i++) {
+            numbers.add(i);
+        }
+        Collections.shuffle(numbers);
+        int sum = 0;
+        for (int i = 0; i < count; i++) {
+            sum += 1 << numbers.get(i);
+        }
+        return sum;
+    }
+
 }

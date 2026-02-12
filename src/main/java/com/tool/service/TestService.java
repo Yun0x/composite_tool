@@ -21,10 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,7 +41,6 @@ public class TestService {
     public void updateMessageLog(String bizId, String errMsg, int sendStatus, String sendTime) {
         testMapper.updateMessageLog(bizId, errMsg, sendStatus, sendTime);
     }
-
     public SseEmitter startSdCardTest(
             String drivePath,
             int rounds,
@@ -127,59 +123,61 @@ public class TestService {
     public Result copyDrumFiles(String sourceDirPath) {
         Path sourceDir = Paths.get(sourceDirPath);
         Path targetDir = Paths.get("E:\\");
+
         if (!Files.exists(sourceDir) || !Files.isDirectory(sourceDir)) {
             return Result.error("源目录不存在或不是目录：" + sourceDir);
         }
         if (!Files.exists(targetDir) || !Files.isDirectory(targetDir)) {
             return Result.error("目标目录不存在或未挂载磁盘：E:\\");
         }
+        try {
+            String cleanCmd = "cmd /c del /f /q /s E:\\* && for /d %p in (E:\\*) do rd /s /q \"%p\"";
+            Process process = Runtime.getRuntime().exec(cleanCmd);
+            process.waitFor();
+            System.out.println("磁盘内容已快速清空");
+        } catch (Exception e) {
+            return Result.error("清空磁盘失败：" + e.getMessage());
+        }
         AtomicInteger mp3Count = new AtomicInteger(0);
         AtomicInteger binCount = new AtomicInteger(0);
 
-        try (Stream<Path> paths = Files.list(sourceDir)) { // 只扫描当前目录
-            paths
-                    .filter(Files::isRegularFile)
+        try (Stream<Path> paths = Files.list(sourceDir)) {
+            paths.filter(Files::isRegularFile)
                     .filter(path -> {
                         String fileName = path.getFileName().toString().toLowerCase();
                         return fileName.endsWith(".mp3") || fileName.endsWith(".bin");
                     })
                     .forEach(path -> {
                         String fileName = path.getFileName().toString();
-                        String lowerName = fileName.toLowerCase();
-                        String targetFileName;
+                        String targetFileName = fileName; // 简化的逻辑
 
-                        if (lowerName.endsWith(".mp3")) {
-                            int dotIndex = fileName.lastIndexOf('.');
-                            targetFileName =
-                                    fileName.substring(0, dotIndex) + fileName.substring(dotIndex);
+                        if (fileName.toLowerCase().endsWith(".mp3")) {
                             mp3Count.incrementAndGet();
                         } else {
-                            targetFileName = fileName;
                             binCount.incrementAndGet();
                         }
 
                         Path targetPath = targetDir.resolve(targetFileName);
                         try {
-                            Files.copy(
-                                    path,
-                                    targetPath,
-                                    StandardCopyOption.REPLACE_EXISTING
-                            );
+                            Files.copy(path, targetPath, StandardCopyOption.REPLACE_EXISTING);
                             System.out.println("已复制: " + fileName + " -> " + targetFileName);
                         } catch (IOException e) {
                             System.err.println("复制失败: " + fileName);
-                            e.printStackTrace();
                         }
                     });
         } catch (IOException e) {
-            e.printStackTrace();
             return Result.error("文件复制过程中发生异常：" + e.getMessage());
         }
 
-        return Result.success(
-                "已成功复制 mp3 文件 " + mp3Count.get() +
-                        " 个，bin 文件 " + binCount.get() + " 个"
-        );
+        return Result.success("清空并成功复制 mp3: " + mp3Count.get() + " 个, bin: " + binCount.get() + " 个");
+    }
+
+    // 辅助方法：递归删除文件夹
+    private void deleteRecursively(Path path) throws IOException {
+        Files.walk(path)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(java.io.File::delete);
     }
 
     public SseEmitter wipeSdCard(Integer type) {

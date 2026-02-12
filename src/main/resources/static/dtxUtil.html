@@ -2,251 +2,508 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>DTX 工具集</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTX Hyper-Toolkit | Digital Laboratory</title>
     <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --accent: #22d3ee;
+            --bg: #f8fafc;
+            --glass: rgba(255, 255, 255, 0.45);
+            --border: rgba(255, 255, 255, 0.5);
+            --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            cursor: default;
         }
 
-        body, html {
+        body {
+            font-family: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+            background: #eef2f7;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 动态流动背景粒子 */
+        .aurora-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
             height: 100%;
-            font-family: 'Segoe UI', sans-serif;
-            background: #f0f2f5;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+            radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.15) 0%, transparent 40%),
+            radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.1) 0%, transparent 60%);
+            filter: blur(60px);
+            animation: auroraMove 20s infinite alternate linear;
+        }
+
+        @keyframes auroraMove {
+            0% {
+                transform: scale(1) rotate(0deg);
+            }
+            100% {
+                transform: scale(1.2) rotate(5deg);
+            }
+        }
+
+        .header-section {
+            padding: 50px 0 30px;
+            text-align: center;
+            animation: fadeInDown 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .header-section h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: -2px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.2));
         }
 
         .wrapper {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 20px;
-            padding: 40px 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 30px;
+            padding: 20px 40px 60px;
+            max-width: 1400px;
+            width: 100%;
+            perspective: 1200px;
         }
 
+        /* 极致毛玻璃卡片 */
         .container {
-            flex: 1 1 300px;
-            max-width: 800px;
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
-            padding: 30px 40px;
-            text-align: center;
-            transition: transform 0.2s;
+            position: relative;
+            background: var(--glass);
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+            transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+            transform-style: preserve-3d;
             display: flex;
             flex-direction: column;
             gap: 15px;
-        }
-
-        .container:hover {
-            transform: translateY(-4px);
-        }
-
-        h1 {
-            font-size: 1.8rem;
-            color: #333;
-            margin-bottom: 20px;
-        }
-
-        .dropzone {
-            padding: 50px 10px;
-            border: 3px dashed #2196F3;
-            border-radius: 16px;
-            color: #666;
-            font-size: 1.15rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
             overflow: hidden;
-            background: #f9fbff;
         }
 
-        .dropzone.disabled {
-            background: #f0f0f0;
-            border-color: #ccc;
-            color: #aaa;
-            cursor: not-allowed;
+        /* 悬停时的3D与光影增强 */
+        .container:hover {
+            transform: translateY(-10px) rotateX(2deg) rotateY(-1deg);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.6);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* 卡片上方的炫光线条 */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--color, var(--primary)), transparent);
+            transition: 0.5s;
+            opacity: 0.6;
+        }
+
+        .container h1 {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #1e293b;
+            text-align: left;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 交互式拖拽区 */
+        .dropzone {
+            height: 140px;
+            border: 2px dashed rgba(99, 102, 241, 0.3);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #64748b;
+            font-weight: 600;
+            transition: 0.3s;
+            background: rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
+
+        .dropzone:hover {
+            border-color: var(--color, var(--primary));
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--color, var(--primary));
+            transform: scale(0.98);
         }
 
         .dropzone.dragover {
-            background: #e3f2fd;
-            border-color: #1976d2;
-            color: #1565c0;
-            box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.1);
+            background: rgba(99, 102, 241, 0.1);
+            border-style: solid;
+            animation: pulse 1.5s infinite;
         }
 
-        .dropzone::after {
-            content: "🎵";
-            font-size: 2rem;
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            opacity: 0.2;
-        }
-
-        .dropzone.dragover::after {
-            opacity: 0.5;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        label {
-            font-weight: 500;
-            color: #333;
+        /* 输入组美化 */
+        .input-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
             text-align: left;
         }
 
-        input[type="text"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 1rem;
+        .input-box label {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding-left: 4px;
         }
 
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            border-radius: 14px;
+            outline: none;
+            transition: 0.3s;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        input:focus {
+            background: white;
+            border-color: var(--color, var(--primary));
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        /* 进度条：极光流动效果 */
         .progressContainer {
             width: 100%;
-            height: 28px;
-            background: #eee;
-            border-radius: 14px;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 20px;
             overflow: hidden;
             display: none;
+            margin-top: 10px;
         }
 
         .progressBar {
             width: 0%;
             height: 100%;
-            background: linear-gradient(90deg, #2196F3, #1565c0);
-            transition: width 0.25s ease-in-out;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            background-size: 200% 100%;
+            animation: flow 2s linear infinite;
+            border-radius: 20px;
         }
 
-        .progressText, .statusText {
-            font-size: 0.9rem;
-            color: #333;
+        @keyframes flow {
+            0% {
+                background-position: 0% 50%;
+            }
+            100% {
+                background-position: 200% 50%;
+            }
+        }
+
+        /* 按钮：流光效果 */
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transform: rotate(45deg);
+            transition: 0.5s;
+        }
+
+        .submit-btn:hover::after {
+            left: 120%;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.6);
+            filter: brightness(1.1);
+        }
+
+        .statusText {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #64748b;
+            min-height: 1.2rem;
+        }
+
+        /* 不同工具的主题色 */
+        .diff-theme {
+            --color: #f43f5e;
+            --primary: #f43f5e;
+            --secondary: #fb7185;
+        }
+
+        .bin-theme {
+            --color: #10b981;
+            --primary: #10b981;
+            --secondary: #34d399;
+        }
+
+        .de-theme {
+            --color: #f59e0b;
+            --primary: #f59e0b;
+            --secondary: #fbbf24;
+        }
+
+        .upload-theme {
+            --color: #0ea5e9;
+            --primary: #0ea5e9;
+            --secondary: #38bdf8;
+        }
+
+        .hammer-theme {
+            --color: #6366f1;
+            --primary: #6366f1;
+            --secondary: #818cf8;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        input[type="file"] {
+            display: none;
         }
     </style>
 </head>
 <body>
+
+<div class="aurora-bg"></div>
+
+<div class="header-section">
+    <h1>DTX工具页</h1>
+    <p style="color: #64748b; font-weight: 600;">测试版，需确保本地有下载这个 ffmpeg</p>
+</div>
+
 <div class="wrapper">
 
-    <div class="container" data-type="diff" style="background: rgba(255,41,41,0.1)">
-        <h1>DTX 生成不同难度</h1>
-        <div class="dropzone">点击或拖拽上传 DTX 文件</div>
+    <div class="container diff-theme" data-type="diff">
+        <h1><span>⚡</span> DTX 生成不同难度</h1>
+        <div class="dropzone">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>上传dtx原版文件</span>
+        </div>
         <input type="file" class="fileInput" accept=".dtx" multiple>
-        <label>输出路径：</label>
-        <input type="text" class="outPath" value="D:\Document\drumFiles\检查">
+        <div class="input-box">
+            <label>保存地址</label>
+            <input type="text" class="outPath" value="D:\Document\drumFiles\检查">
+        </div>
         <div class="progressContainer">
             <div class="progressBar"></div>
         </div>
-        <div class="progressText"></div>
-        <div class="statusText"></div>
+        <div class="statusText">等待处理</div>
     </div>
 
-    <div class="container" data-type="bin" style="background: rgba(45,255,58,0.1)">
-        <h1>DTX 转 BIN 工具</h1>
-        <div class="dropzone">点击或拖拽上传 DTX 文件</div>
+    <div class="container bin-theme" data-type="bin">
+        <h1><span>⚡</span> dtx转bin</h1>
+        <div class="dropzone">
+            <span>传入dtx生成对应bin文件</span>
+        </div>
         <input type="file" class="fileInput" accept=".dtx" multiple>
-        <label>输出路径：</label>
-        <input type="text" class="outPath" value="D:\Document\drumFiles\检查">
+        <div class="input-box">
+            <label>保存路径</label>
+            <input type="text" class="outPath" value="D:\Document\drumFiles\20260208调整">
+        </div>
         <div class="progressContainer">
             <div class="progressBar"></div>
         </div>
-        <div class="progressText"></div>
-        <div class="statusText"></div>
+        <div class="statusText">等待处理</div>
     </div>
 
-    <div class="container" data-type="decompile" style="background: rgba(255,206,0,0.1)">
-        <h1>Bin 反编译工具</h1>
-        <div class="dropzone">点击或拖拽上传 Bin 文件</div>
+    <div class="container de-theme" data-type="decompile">
+        <h1><span>⚡</span>反编译bin</h1>
+        <div class="dropzone">
+            <span>点击拖拽上传bin</span>
+        </div>
         <input type="file" class="fileInput" accept=".bin" multiple>
-        <label>输出路径：</label>
-        <input type="text" class="outPath" value="D:\Document\drumFiles\检查">
+        <div class="input-box">
+            <label>保存路径</label>
+            <input type="text" class="outPath" value="D:\Document\drumFiles\20260208调整">
+        </div>
         <div class="progressContainer">
             <div class="progressBar"></div>
         </div>
-        <div class="progressText"></div>
-        <div class="statusText"></div>
+        <div class="statusText">等待加载</div>
     </div>
-    <div class="container" data-type="upload" style="background: rgba(41,216,255,0.1)">
-        <h1>DTX一键生成</h1>
-        <div class="dropzone">上传初始dtx生成全套dtx、bin、excel、txt内容</div>
+
+    <div class="container upload-theme" data-type="upload">
+        <h1><span>⚡</span> dtx一键生成</h1>
+        <div class="dropzone">
+            <span>一键生成：dtx+bin+反编译内容</span>
+        </div>
         <input type="file" class="fileInput" accept=".dtx" multiple>
-        <label>输出路径：</label>
-        <input type="text" class="outPath" value="D:\Document\drumFiles\output">
+        <div class="input-box">
+            <label>保存路径</label>
+            <input type="text" class="outPath" value="D:\Document\drumFiles\20260208调整">
+        </div>
         <div class="progressContainer">
             <div class="progressBar"></div>
         </div>
-        <div class="progressText"></div>
-        <div class="statusText"></div>
+        <div class="statusText">等待启动</div>
+    </div>
+
+    <div class="container hammer-theme" data-type="hammer">
+        <h1><span>⚡</span>生成打地鼠bin</h1>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="input-box">
+                <label>开始间隔 (S)</label>
+                <input type="number" class="beginTime" value="1">
+            </div>
+            <div class="input-box">
+                <label>结束间隔 (S)</label>
+                <input type="number" class="endTime" value="1">
+            </div>
+            <div class="input-box">
+                <label>歌曲时间 (S)</label>
+                <input type="number" class="songDuration" value="240">
+            </div>
+            <div class="input-box">
+                <label>bpm</label>
+                <input type="number" class="BPM" value="120">
+            </div>
+        </div>
+
+        <div class="input-box" style="margin-top: 5px;">
+            <label>bin保存路径</label>
+            <input type="text" class="outPath" value="D:\Document\drumFiles\20260208调整">
+        </div>
+
+        <button class="submit-btn">开始生成</button>
+
+        <div class="progressContainer">
+            <div class="progressBar"></div>
+        </div>
+        <div class="statusText">待启动</div>
     </div>
 </div>
+
 <script>
     document.querySelectorAll('.container').forEach(container => {
         const dropzone = container.querySelector('.dropzone');
         const fileInput = container.querySelector('.fileInput');
         const progressContainer = container.querySelector('.progressContainer');
         const progressBar = container.querySelector('.progressBar');
-        const progressText = container.querySelector('.progressText');
         const statusText = container.querySelector('.statusText');
         const outPathInput = container.querySelector('.outPath');
         const type = container.dataset.type;
+        const submitBtn = container.querySelector('.submit-btn');
         let uploading = false;
-        function setDropzoneDisabled(state) {
-            uploading = state;
-            dropzone.classList.toggle('disabled', state);
-        }
-        dropzone.addEventListener('dragover', e => {
+        dropzone?.addEventListener('dragover', e => {
             e.preventDefault();
             if (!uploading) dropzone.classList.add('dragover');
         });
-        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-        dropzone.addEventListener('drop', e => {
+        dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone?.addEventListener('drop', e => {
             e.preventDefault();
             dropzone.classList.remove('dragover');
             if (!uploading) handleFiles([...e.dataTransfer.files]);
         });
-        dropzone.addEventListener('click', () => {
+        dropzone?.addEventListener('click', () => {
             if (!uploading) fileInput.click();
         });
-        fileInput.addEventListener('change', e => {
+        fileInput?.addEventListener('change', e => {
             if (!uploading) handleFiles([...e.target.files]);
             fileInput.value = "";
         });
-        function uploadSingleFile(file, outPath, index, total, callback) {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("outPutPath", outPath);
-            formData.append("type", type);
-            let url;
-            if (type === "bin") {
-                url = "http://localhost:9001/tool/uploadDtx";
-            } else if (type === "diff") {
-                url = "http://localhost:9001/tool/genDiffAndEasy";
-            } else if (type === "decompile") {
-                url = "http://localhost:9001/tool/decompileBin";
-            } else if (type === "upload") {
-                url = "http://localhost:9001/tool/convertDtx";
-            }
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", url, true);
-            xhr.upload.onprogress = function (e) {
-                if (e.lengthComputable) {
-                    const base = index / total * 100;
-                    const percent = base + (e.loaded / e.total) * (100 / total);
-                    progressBar.style.width = percent.toFixed(1) + "%";
-                    progressText.textContent = percent.toFixed(1) + "%";
-                }
-            };
-            xhr.onload = callback;
-            xhr.onerror = function () {
-                statusText.textContent = `❌ 上传失败：${file.name}`;
-                callback();
-            };
+        if (type === 'hammer' && submitBtn) {
+            submitBtn.addEventListener('click', () => {
+                if (uploading) return;
 
-            xhr.send(formData);
+                const outPath = outPathInput.value;
+                const beginTime = container.querySelector('.beginTime').value;
+                const endTime = container.querySelector('.endTime').value;
+                const songDuration = container.querySelector('.songDuration').value;
+                const BPM = container.querySelector('.BPM').value;
+
+                if (!outPath) return alert("保存地址没填");
+
+                uploading = true;
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '50%';
+                statusText.textContent = "处理中...";
+
+                const params = new URLSearchParams();
+                params.append('outPutPath', outPath);
+                params.append('beginTime', beginTime);
+                params.append('endTime', endTime);
+                params.append('songDuration', songDuration);
+                params.append('BPM', BPM);
+
+                fetch(`http://localhost:9001/tool/genHammerModel?${params.toString()}`, {method: 'POST'})
+                    .then(res => res.json())
+                    .then(() => {
+                        progressBar.style.width = '100%';
+                        statusText.style.color = 'var(--secondary)';
+                        statusText.textContent = "已生成";
+                    })
+                    .catch(err => {
+                        statusText.textContent = "错误";
+                        console.error(err);
+                    })
+                    .finally(() => {
+                        uploading = false;
+                    });
+            });
         }
 
         function handleFiles(files) {
@@ -254,33 +511,26 @@
                 if (type === "decompile") return f.name.toLowerCase().endsWith('.bin');
                 return f.name.toLowerCase().endsWith('.dtx');
             });
-            if (filteredFiles.length === 0) {
-                alert(type === "decompile" ? '请选择 .BIN 文件' : '请选择 .DTX 文件');
-                return;
-            }
 
+            if (filteredFiles.length === 0) return alert('Invalid File Format');
             const outPath = outPathInput.value.trim();
-            if (!outPath) {
-                alert('请填写输出路径');
-                return;
-            }
+            if (!outPath) return alert('保存路径没填');
 
-            setDropzoneDisabled(true);
+            uploading = true;
             progressContainer.style.display = 'block';
             progressBar.style.width = '0%';
-            progressText.textContent = '0%';
-            statusText.textContent = `准备上传 ${filteredFiles.length} 个文件...`;
 
             let index = 0;
 
             function uploadNext() {
                 if (index >= filteredFiles.length) {
-                    statusText.textContent = `✅ 全部 ${filteredFiles.length} 个文件完成`;
-                    setDropzoneDisabled(false);
+                    statusText.textContent = `完成: ${filteredFiles.length} 个文件`;
+                    uploading = false;
                     return;
                 }
                 const file = filteredFiles[index];
-                statusText.textContent = `正在上传 (${index + 1}/${filteredFiles.length})：${file.name}`;
+                statusText.textContent = `进程： [${index + 1}/${filteredFiles.length}]: ${file.name}`;
+
                 uploadSingleFile(file, outPath, index, filteredFiles.length, () => {
                     index++;
                     uploadNext();
@@ -289,7 +539,43 @@
 
             uploadNext();
         }
+
+        function uploadSingleFile(file, outPath, index, total, callback) {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("outPutPath", outPath);
+
+            let url = "";
+            switch (type) {
+                case "bin":
+                    url = "http://localhost:9001/tool/uploadDtx";
+                    break;
+                case "diff":
+                    url = "http://localhost:9001/tool/genDiffAndEasy";
+                    break;
+                case "decompile":
+                    url = "http://localhost:9001/tool/decompileBin";
+                    break;
+                case "upload":
+                    url = "http://localhost:9001/tool/convertDtx";
+                    break;
+            }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const base = index / total * 100;
+                    const percent = base + (e.loaded / e.total) * (100 / total);
+                    progressBar.style.width = percent + "%";
+                }
+            };
+            xhr.onload = callback;
+            xhr.onerror = callback;
+            xhr.send(formData);
+        }
     });
 </script>
+
 </body>
 </html>

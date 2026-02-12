@@ -2,197 +2,468 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>工作流工具箱</title>
-
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-
+    <title>TERMINAL | 智能控制终端</title>
     <style>
         :root {
-            --bg-color: #f0f2f5;
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --card-hover-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            --bg-color: #f8fbff;
+            --glass-base: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(255, 255, 255, 0.7);
+            --primary-accent: #6366f1;
+            --secondary-accent: #0ea5e9;
+            --text-title: #0f172a;
+            --text-body: #64748b;
+            --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background-color: var(--bg-color);
-            background-image: radial-gradient(#d1d5db 1px, transparent 1px);
-            background-size: 20px 20px; /* 背景点状纹理 */
+            font-family: 'PingFang SC', 'HarmonyOS Sans', 'Segoe UI', system-ui;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
+            overflow: hidden;
+            color: var(--text-title);
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                    repeating-linear-gradient(
+                            0deg,
+                            rgba(255,255,255,0.02) 0px,
+                            rgba(255,255,255,0.02) 1px,
+                            transparent 1px,
+                            transparent 2px
+                    );
+            mix-blend-mode: overlay;
+        }
+        /* --- 炫技背景：动态极光流体 --- */
+        .background-visuals {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #ffffff 0%, #f0f4f8 100%);
+        }
+
+        .blob {
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            mix-blend-mode: multiply;
+            animation: move 25s infinite alternate ease-in-out;
+        }
+
+        .blob-1 {
+            background: #e0e7ff;
+            top: -10%;
+            left: -10%;
+            animation-duration: 20s;
+        }
+
+        .blob-2 {
+            background: #dcfce7;
+            bottom: -10%;
+            right: 10%;
+            animation-duration: 25s;
+            animation-delay: -2s;
+        }
+
+        .blob-3 {
+            background: #e0f2fe;
+            top: 40%;
+            left: 30%;
+            animation-duration: 30s;
+            animation-delay: -5s;
+        }
+
+        @keyframes move {
+            0% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+            100% {
+                transform: translate(15vw, 10vh) scale(1.2) rotate(45deg);
+            }
         }
 
         header {
-            width: 100%;
-            padding: 40px 0;
+            padding: 60px 0 30px;
             text-align: center;
-            background: #fff;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 40px;
+            z-index: 10;
         }
 
         h1 {
-            margin: 0;
-            font-size: 2.2rem;
-            background: var(--primary-gradient);
+            font-size: 2.8rem;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            background: linear-gradient(135deg, #1e293b 0%, #6366f1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-body);
             letter-spacing: 2px;
-            font-weight: 800;
+            text-transform: uppercase;
         }
 
+        /* --- 网格容器 --- */
         .container {
-            width: 90%;
-            max-width: 1100px;
+            width: 92%;
+            max-width: 1200px;
             display: grid;
-            /* 定义布局网格 */
             grid-template-columns: repeat(4, 1fr);
-            grid-auto-rows: minmax(160px, auto);
-            gap: 20px;
-            padding-bottom: 50px;
+            gap: 24px;
+            padding: 20px;
+            perspective: 2000px; /* 为3D交互做准备 */
         }
 
-        /* 通用卡片样式 */
+        /* --- 炫技点：玻璃态卡片 & 光影追踪 --- */
         .module {
-            background: #fff;
-            border-radius: 16px;
+            position: relative;
+            background: var(--glass-base);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            padding: 40px 24px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
-            text-align: center;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid rgba(0,0,0,0.05);
-            position: relative;
+            transition: transform 0.1s var(--ease), box-shadow 0.4s var(--ease), background 0.4s var(--ease);
             overflow: hidden;
-        }
-
-        .module:hover {
-            transform: translateY(-8px);
-            box-shadow: var(--card-hover-shadow);
-            border-color: #ff0000;
-        }
-
-        .module i {
-            font-size: 2.5rem;
-            margin-bottom: 15px;
-            transition: transform 0.3s;
-        }
-
-        .module:hover i {
-            transform: scale(1.1);
-        }
-
-        .module-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: #2d3748;
-        }
-
-        /* 核心逻辑：将这四个工具排在一行 (占据 4 列) */
-        .row-focus {
-            grid-column: span 1;
-            background: linear-gradient(to bottom right, #ffffff, #f9faff);
-        }
-
-        .color-1 { color: #4f46e5; border-bottom: 4px solid #4f46e5; } /* 复制 */
-        .color-2 { color: #f59e0b; border-bottom: 4px solid #f59e0b; } /* 转换 */
-        .color-3 { color: #10b981; border-bottom: 4px solid #10b981; } /* DTX */
-        .color-4 { color: #ec4899; border-bottom: 4px solid #ec4899; } /* MP3 */
-
-        .module.secondary {
-            grid-column: span 1;
-            font-size: 1rem;
-            background: rgba(255,255,255,0.8);
-        }
-
-        .module.wide {
-            grid-column: span 2;
+            box-shadow:
+                    0 10px 30px -10px rgba(0, 0, 0, 0.05),
+                    inset 0 1px 1px rgba(255,255,255,0.6),
+                    inset 0 -1px 1px rgba(255,255,255,0.2);
+            --mouse-x: 50%;
+            --mouse-y: 50%;
         }
 
         .module::before {
             content: '';
             position: absolute;
-            top: -10px;
-            right: -10px;
-            width: 40px;
-            height: 40px;
-            background: currentColor;
-            opacity: 0.05;
-            border-radius: 50%;
+            inset: 0;
+            background: radial-gradient(circle at var(--mouse-x) var(--mouse-y), rgba(255, 255, 255, 0.8) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.4s;
+            z-index: 1;
         }
 
-        @media (max-width: 850px) {
+        .module:hover {
+            transform: scale(1.02) translateY(-5px);
+            box-shadow:
+                    0 40px 80px -20px rgba(0, 0, 0, 0.15),
+                    inset 0 1px 1px rgba(255,255,255,0.8),
+                    inset 0 -1px 1px rgba(255,255,255,0.3);
+            background: rgba(255, 255, 255, 0.75);
+        }
+
+        .module:hover::before {
+            opacity: 1;
+        }
+
+        .icon-container {
+            width: 72px;
+            height: 72px;
+            background: #ffffff;
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 20px -5px rgba(0, 0, 0, 0.08);
+            position: relative;
+            z-index: 2;
+            transition: 0.5s var(--ease);
+        }
+        .icon-container::before {
+            content: '';
+            position: absolute;
+            inset: -20px;
+            background: radial-gradient(
+                    circle,
+                    rgba(99,102,241,0.35),
+                    transparent 60%
+            );
+            opacity: 0;
+            transition: 0.6s var(--ease);
+            z-index: -1;
+        }
+
+        .module:hover .icon-container {
+            transform: translateY(-5px) rotateX(15deg);
+            background: var(--primary-accent);
+            color: #ffffff;
+        }
+        .module:hover .icon-container::before {
+            opacity: 1;
+        }
+        .icon-container svg {
+            width: 32px;
+            height: 32px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
+            transition: 0.5s;
+        }
+        .icon-container::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 26px;
+            border: 1px solid rgba(99,102,241,0.4);
+            opacity: 0;
+            transform: rotate(0deg);
+            transition: 0.6s var(--ease);
+        }
+
+        .module:hover .icon-container::after {
+            opacity: 1;
+            transform: rotate(90deg);
+        }
+        .module-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1e293b;
+            z-index: 2;
+            text-align: center;
+            position: relative;
+        }
+
+        .module-title::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: -8px;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-accent), transparent);
+            transform: translateX(-50%);
+            transition: 0.5s var(--ease);
+        }
+
+        .module:hover .module-title::after {
+            width: 60%;
+        }
+        .wide {
+            grid-column: span 2;
+        }
+
+        .full-width {
+            grid-column: span 4;
+        }
+
+        .module::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transform: rotate(45deg);
+            transition: 0.8s;
+            pointer-events: none;
+        }
+
+        .module:hover::after {
+            top: 100%;
+            left: 100%;
+        }
+        .module:active {
+            transform: scale(0.96) translateY(2px);
+            transition: 0.05s;
+        }
+
+        @media (max-width: 1024px) {
             .container {
                 grid-template-columns: repeat(2, 1fr);
             }
-            .module.wide {
+
+            .full-width, .wide {
                 grid-column: span 2;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .blob,
+            .module,
+            .icon-container {
+                animation: none !important;
+                transition: none !important;
             }
         }
     </style>
 </head>
 <body>
 
+<div class="background-visuals">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+</div>
+
 <header>
-    <h1>小工具控制台</h1>
+    <h1>工作流工具箱</h1>
+    <div class="status-bar">Kernel Ready // Neural Link Active</div>
 </header>
 
 <div class="container">
-    <div class="module secondary" onclick="navigate('sdCardTest.html')">
-        <span style="font-size: 2rem">💾</span>
+    <div class="module" onclick="navigate('sdCardTest.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M21 4H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+                <path d="M7 10h10M7 14h10"/>
+            </svg>
+        </div>
         <div class="module-title">SD卡检测</div>
     </div>
-    <div class="module secondary" onclick="navigate('upload.html')">
-        <span style="font-size: 2rem">📄</span>
+
+    <div class="module" onclick="navigate('upload.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+        </div>
         <div class="module-title">TXT 上传</div>
     </div>
-    <div class="module wide secondary" onclick="navigate('controller.html')">
-        <span style="font-size: 2rem">⚙️</span>
+
+    <div class="module wide" onclick="navigate('controller.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+        </div>
         <div class="module-title">测试启动下载工具</div>
     </div>
 
-    <div class="module row-focus color-1" onclick="navigate('copyDrumFiles.html')">
-        <span style="font-size: 2.5rem">📂</span>
+    <div class="module" onclick="navigate('copyDrumFiles.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1"/>
+            </svg>
+        </div>
         <div class="module-title">快速复制音乐文件</div>
     </div>
-    <div class="module row-focus color-2" onclick="navigate('fullProcessTool.html')">
-        <span style="font-size: 2.5rem">⚡</span>
+
+    <div class="module" onclick="navigate('fullProcessTool.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+        </div>
         <div class="module-title">一键转换工具</div>
     </div>
-    <div class="module row-focus color-3" onclick="navigate('dtxUtil.html')">
-        <span style="font-size: 2.5rem">🥁</span>
+
+    <div class="module" onclick="navigate('dtxUtil.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 7v2M12 15v2M7 12h2M15 12h2"/>
+            </svg>
+        </div>
         <div class="module-title">DTX 工具</div>
     </div>
-    <div class="module row-focus color-4" onclick="navigate('processMp3.html')">
-        <span style="font-size: 2.5rem">🎵</span>
+
+    <div class="module" onclick="navigate('processMp3.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/>
+                <circle cx="18" cy="16" r="3"/>
+            </svg>
+        </div>
         <div class="module-title">MP3 工具</div>
+    </div>
+
+    <div class="module full-width" onclick="navigate('HammerModel.html')">
+        <div class="icon-container">
+            <svg viewBox="0 0 24 24">
+                <path d="M14.5 2L3.5 13h10l-1 9 11-11h-10l1-9z"/>
+            </svg>
+        </div>
+        <div class="module-title">打地鼠模式生成工具</div>
     </div>
 </div>
 
 <script>
+    // 极致炫技：实时光影追踪系统
+    const modules = document.querySelectorAll('.module');
+    window.addEventListener('focus', () => {
+        document.body.animate(
+            [
+                { filter: 'brightness(0.98)' },
+                { filter: 'brightness(1)' }
+            ],
+            { duration: 400, easing: 'ease-out' }
+        );
+    });
+    document.addEventListener('mousemove', (e) => {
+        modules.forEach(module => {
+            const rect = module.getBoundingClientRect();
+
+            // 计算相对于当前卡片的百分比坐标
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+            // 更新CSS变量，实时改变聚光灯位置
+            module.style.setProperty('--mouse-x', `${x}%`);
+            module.style.setProperty('--mouse-y', `${y}%`);
+
+            // 可选：实现轻微的3D倾斜跟随
+            if (module.matches(':hover')) {
+                const rotateX = -(y - 50) / 10;
+                const rotateY = (x - 50) / 10;
+                module.style.transform = `scale(1.02) translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            }
+        });
+    });
+
     function navigate(url) {
-        location.href = url + '?ts=' + Date.now();
+        // 增加点击波纹反馈效果
+        const module = event.currentTarget;
+        module.style.transform = 'scale(0.95) perspective(1000px)';
+
+        // 触觉反馈
+        if (window.navigator.vibrate) window.navigator.vibrate(20);
+
+        setTimeout(() => {
+            location.href = url + '?ts=' + Date.now();
+        }, 200);
     }
 
-    // 页面加载时清空缓存
-    window.addEventListener('load', () => {
+    // 页面加载时的清理逻辑
+    window.onload = () => {
         try {
             localStorage.clear();
             sessionStorage.clear();
-            console.log("已清空 localStorage 和 sessionStorage");
+            console.log("%c SYSTEM %c CACHE_CLEARED", "background:#6366f1;color:#fff;padding:2px 5px;border-radius:3px", "color:#6366f1");
         } catch (e) {
-            console.warn("清理缓存失败", e);
         }
-    });
+    };
 </script>
+
 </body>
 </html>

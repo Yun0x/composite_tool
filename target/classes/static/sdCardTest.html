@@ -2,131 +2,392 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>SD 卡整盘校验</title>
+    <title>SD 卡整盘校验 | 核心诊断</title>
     <style>
+        :root {
+            --primary: #6366f1;
+            --accent: #0ea5e9;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --glass: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: "Consolas", "Monaco", monospace;
-            background: #0f172a;
-            color: #e5e7eb;
-            padding: 40px;
-            display: flex;
-            justify-content: center;
-        }
-        .panel {
-            background: #020617;
-            border-radius: 12px;
-            padding: 30px 40px;
-            width: 900px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.7);
-        }
-        h1 {
-            margin-bottom: 25px;
-            font-size: 28px;
-            text-align: center;
-        }
-        .row {
+            background-color: #f8fbff;
+            font-family: 'PingFang SC', 'HarmonyOS Sans', 'Segoe UI', system-ui;
+            min-height: 100vh;
             display: flex;
             align-items: center;
-            margin-bottom: 18px;
+            justify-content: center;
+            color: var(--text-main);
+            overflow-x: hidden;
         }
-        label {
-            width: 160px;
-            font-weight: bold;
-            font-size: 16px;
+
+        /* --- 动态背景系统 --- */
+        .bg-visuals {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(circle at center, #ffffff 0%, #f0f4f8 100%);
         }
+
+        .blob {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: move 20s infinite alternate ease-in-out;
+        }
+
+        .blob-1 {
+            background: #e0e7ff;
+            top: -10%;
+            left: -10%;
+        }
+
+        .blob-2 {
+            background: #e0f2fe;
+            bottom: -10%;
+            right: -10%;
+            animation-delay: -5s;
+        }
+
+        @keyframes move {
+            from {
+                transform: translate(0, 0) scale(1);
+            }
+            to {
+                transform: translate(10vw, 5vh) scale(1.1);
+            }
+        }
+
+        /* --- 主面板 --- */
+        .dashboard {
+            width: 95%;
+            max-width: 1000px;
+            background: var(--glass);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            padding: 40px;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.08);
+            position: relative;
+        }
+
+        header {
+            margin-bottom: 32px;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #1e293b, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .breadcrumb {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* --- 配置网格 --- */
+        .config-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 16px;
+            background: rgba(255, 255, 255, 0.4);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            padding-left: 4px;
+        }
+
         input, select {
-            flex: 1;
-            padding: 8px 12px;
-            font-size: 16px;
-            border-radius: 6px;
-            border: none;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            background: #2563eb;
-            color: white;
-            margin-left: 10px;
-        }
-        button:disabled {
-            background: #475569;
-            cursor: not-allowed;
-        }
-        .progress-container {
             width: 100%;
-            background: #1e293b;
-            border-radius: 6px;
-            height: 32px;
-            margin-top: 20px;
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            transition: var(--ease) 0.3s;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        /* --- 动作按钮 --- */
+        .actions {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        button {
+            height: 46px;
+            padding: 0 24px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--ease) 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #startBtn {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        #startBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        button.secondary {
+            background: white;
+            color: var(--text-main);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+        }
+
+        /* --- 核心仪表盘 --- */
+        .monitor-panel {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 24px;
+        }
+
+        .data-card {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 20px;
+            padding: 20px;
+            position: relative;
             overflow: hidden;
         }
-        .progress-bar {
+
+        .data-card .label {
+            font-size: 0.7rem;
+            color: var(--text-sub);
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .data-card .value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        /* --- 进度系统 --- */
+        .progress-section {
+            margin-top: 32px;
+            background: white;
+            padding: 30px;
+            border-radius: 24px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .progress-track {
+            height: 12px;
+            background: #f1f5f9;
+            border-radius: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
             height: 100%;
             width: 0%;
-            background: #3b82f6;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 100px;
+            transition: width 0.5s var(--ease);
+            position: relative;
         }
-        .status {
-            margin-top: 12px;
-            font-size: 16px;
-            color: #93c5fd;
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                    90deg,
+                    transparent, rgba(255, 255, 255, 0.4), transparent
+            );
+            animation: shimmer 2s infinite;
         }
-        .output {
-            margin-top: 20px;
-            background: #111827;
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* --- 日志区域 --- */
+        .console-box {
+            margin-top: 24px;
+            background: #0f172a;
+            border-radius: 16px;
             padding: 20px;
-            border-radius: 8px;
-            font-size: 16px;
-            white-space: pre-wrap;
-            max-height: 300px;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            height: 200px;
             overflow-y: auto;
-            line-height: 1.4;
+            line-height: 1.6;
+            border: 4px solid #1e293b;
         }
-        .speed {
-            margin-top: 8px;
-            font-size: 16px;
-            color: #facc15;
+
+        .console-box::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .console-box::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-left: 2px solid var(--primary);
+            padding-left: 10px;
         }
     </style>
 </head>
 <body>
 
-<div class="panel">
-    <h1>SD 卡整盘校验</h1>
+<div class="bg-visuals">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+</div>
 
-    <div class="row">
-        <label>盘符 / 路径</label>
-        <input id="drivePath" value="E:\" />
+<div class="dashboard">
+    <header>
+        <div>
+            <div class="breadcrumb">Diagnostic System / Storage / Verify</div>
+            <h1>SD 卡整盘校验</h1>
+        </div>
+        <div id="statusBadge"
+             style="font-size: 0.7rem; background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 100px; font-weight: 800;">
+            READY
+        </div>
+    </header>
+
+    <div class="config-grid">
+        <div class="input-group">
+            <label>盘符 / 挂载路径</label>
+            <input id="drivePath" value="E:\" placeholder="例如 E:\">
+        </div>
+        <div class="input-group">
+            <label>覆盖轮数</label>
+            <input id="rounds" type="number" min="1" value="1">
+        </div>
+        <div class="input-group">
+            <label>随机模式</label>
+            <select id="randomPattern">
+                <option value="true">随机 Pattern</option>
+                <option value="false">固定 Pattern</option>
+            </select>
+        </div>
+        <div class="actions">
+            <button id="startBtn" onclick="startTest()">开始诊断</button>
+            <button class="secondary" onclick="stopTest()">断开连接</button>
+        </div>
     </div>
 
-    <div class="row">
-        <label>覆盖轮数</label>
-        <input id="rounds" type="number" min="1" value="1" />
+    <div class="monitor-panel">
+        <div class="data-card">
+            <div class="label">传输速率</div>
+            <div class="value" id="speedDisplay" style="color: var(--warning);">0.00 <span style="font-size: 0.8rem;">MB/s</span>
+            </div>
+        </div>
+        <div class="data-card">
+            <div class="label">当前状态</div>
+            <div class="value" id="statusDisplay">等待中</div>
+        </div>
+        <div class="data-card">
+            <div class="label">异常错误</div>
+            <div class="value" id="errorDisplay" style="color: var(--success);">0 <span style="font-size: 0.8rem;">BLOCKS</span>
+            </div>
+        </div>
     </div>
 
-    <div class="row">
-        <label>随机 Pattern</label>
-        <select id="randomPattern">
-            <option value="true">是</option>
-            <option value="false">否</option>
-        </select>
+    <div class="progress-section">
+        <div class="progress-header">
+            <span id="progressTitle">校验进度</span>
+            <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progressBar"></div>
+        </div>
     </div>
 
-    <div class="row">
-        <button id="startBtn" onclick="startTest()">开始校验</button>
-        <button onclick="stopTest()">断开</button>
+    <div class="console-box" id="output">
+        [SYSTEM] 诊断系统准备就绪。请选择驱动器并点击“开始诊断”。
     </div>
-
-    <div class="progress-container">
-        <div class="progress-bar" id="progressBar"></div>
-    </div>
-
-    <div class="status" id="status">等待开始...</div>
-    <div class="speed" id="speed">速度: 0 MB/s</div>
-    <div class="output" id="output">等待开始...</div>
 </div>
 
 <script>
@@ -140,47 +401,64 @@
         if (eventSource) eventSource.close();
 
         document.getElementById("startBtn").disabled = true;
-        document.getElementById("status").textContent = "连接中...";
-        document.getElementById("output").textContent = "";
+        document.getElementById("statusBadge").textContent = "RUNNING";
+        document.getElementById("statusBadge").style.background = "#dcfce7";
+        document.getElementById("statusBadge").style.color = "#166534";
+
+        document.getElementById("output").innerHTML = '<div class="log-entry">正在建立通信链路...</div>';
         document.getElementById("progressBar").style.width = '0%';
-        document.getElementById("speed").textContent = "速度: 0 MB/s";
+        document.getElementById("speedDisplay").innerHTML = '0.00 <span style="font-size: 0.8rem;">MB/s</span>';
 
         const url = `/tool/sdCardTest?drivePath=${drivePath}&rounds=${rounds}&randomPattern=${randomPattern}`;
         eventSource = new EventSource(url);
 
-        eventSource.onmessage = function(event) {
+        eventSource.onmessage = function (event) {
             const data = event.data;
 
-            // 输出到日志区域
-            document.getElementById("output").textContent = data;
+            // 实时日志
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.textContent = data;
+            const output = document.getElementById("output");
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
 
-            // 解析后端输出
+            // 高级正则解析
             const match = data.match(/([0-9.]+)%.*轮次：([0-9]+).*已校验：([0-9.]+)([KMGT]?B).*错误块数：([0-9]+).*速度：([0-9.]+) MB\/s/);
-            if(match){
+            if (match) {
                 const percent = parseFloat(match[1]);
                 const speed = parseFloat(match[6]);
+                const errors = parseInt(match[5]);
 
-                // 更新进度条
+                // 更新仪表盘
                 document.getElementById("progressBar").style.width = percent + '%';
-                document.getElementById("speed").textContent = "速度: " + speed.toFixed(2) + " MB/s";
+                document.getElementById("progressPercent").textContent = percent + '%';
+                document.getElementById("speedDisplay").innerHTML = speed.toFixed(2) + ' <span style="font-size: 0.8rem;">MB/s</span>';
+                document.getElementById("errorDisplay").innerHTML = errors + ' <span style="font-size: 0.8rem;">BLOCKS</span>';
+                document.getElementById("errorDisplay").style.color = errors > 0 ? 'var(--warning)' : 'var(--success)';
+                document.getElementById("statusDisplay").textContent = "轮次 " + match[2] + " 校验中";
             }
-
-            document.getElementById("status").textContent = "运行中...";
         };
 
-        eventSource.onerror = function() {
-            document.getElementById("status").textContent = "已停止或断开";
-            document.getElementById("startBtn").disabled = false;
-            if(eventSource) eventSource.close();
+        eventSource.onerror = function () {
+            stopTest();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.style.borderLeftColor = 'var(--warning)';
+            logEntry.textContent = "[SYSTEM] 链路已正常关闭或诊断完成。";
+            document.getElementById("output").appendChild(logEntry);
         };
     }
 
     function stopTest() {
-        if(eventSource){
+        if (eventSource) {
             eventSource.close();
             eventSource = null;
-            document.getElementById("status").textContent = "已手动断开";
+            document.getElementById("statusBadge").textContent = "STOPPED";
+            document.getElementById("statusBadge").style.background = "#fee2e2";
+            document.getElementById("statusBadge").style.color = "#991b1b";
             document.getElementById("startBtn").disabled = false;
+            document.getElementById("statusDisplay").textContent = "已停止";
         }
     }
 </script>

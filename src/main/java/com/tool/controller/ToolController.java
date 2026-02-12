@@ -11,7 +11,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -199,11 +200,98 @@ public class ToolController {
     }
 
 
-
-
     @PostMapping("/copyDrumFiles")
     public Result copyDrumFiles(@RequestParam String path) {
         return testService.copyDrumFiles(path);
+    }
+
+    @PostMapping("/genHammerModelHand")
+    public Result genHammerModel(@RequestParam String outPutPath, @RequestParam Integer beginTime, @RequestParam Integer endTime, @RequestParam Integer songDuration, @RequestParam Integer BPM) {
+        return uploadService.genHammerModelHand(outPutPath, beginTime, endTime, songDuration, BPM);
+    }
+
+    @PostMapping("/genHammerModel")
+    public Result genHammerModel(
+            @RequestParam("mp3File") MultipartFile mp3File,
+            @RequestParam("dtxFile") MultipartFile dtxFile,
+            @RequestParam String outPutPath,
+            @RequestParam Integer beginTime,
+            @RequestParam Integer endTime) {
+        File tempMp3 = null;
+        try {
+            String originalFilename = mp3File.getOriginalFilename();
+            String suffix = (originalFilename != null && originalFilename.contains("."))
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".mp3";
+            tempMp3 = File.createTempFile("process_", suffix);
+            try (InputStream is = mp3File.getInputStream()) {
+                java.nio.file.Files.copy(is, tempMp3.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            Integer actualDurationSeconds = getMp3DurationInSeconds(tempMp3);
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(dtxFile.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+            }
+            String fileContent = sb.toString();
+            List<Double> bpmList = DtxUtils.extractBpmMap(fileContent);
+            int BPM = (bpmList != null && !bpmList.isEmpty()) ? bpmList.get(0).intValue() : 120;
+            String title = "未知曲目";
+            if (originalFilename != null && !originalFilename.isEmpty()) {
+                int underscoreIndex = originalFilename.indexOf(".");
+                if (underscoreIndex > 0) {
+                    title = originalFilename.substring(0, underscoreIndex);
+                } else {
+                    int dotIndex = originalFilename.lastIndexOf(".");
+                    title = (dotIndex > 0) ? originalFilename.substring(0, dotIndex) : originalFilename;
+                }
+            }
+            uploadService.hammerInvertDtxFile(dtxFile, outPutPath + File.separator + title + "_level2.bin");
+            return uploadService.genHammerModel(
+                    outPutPath,
+                    beginTime,
+                    endTime,
+                    actualDurationSeconds,
+                    BPM,
+                    title);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("处理失败：" + e.getMessage());
+        } finally {
+            if (tempMp3 != null && tempMp3.exists()) {
+                tempMp3.delete();
+            }
+        }
+    }
+
+    private Integer getMp3DurationInSeconds(File file) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(
+                "D:\\Code\\ffmpeg\\bin\\ffmpeg.exe",
+                "-i", file.getAbsolutePath()
+        );
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        double totalSeconds = 0;
+
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.contains("Duration:")) {
+                    String dur = line.substring(line.indexOf("Duration:") + 10, line.indexOf(", start:")).trim();
+                    String[] parts = dur.split(":");
+                    double h = Double.parseDouble(parts[0]);
+                    double m = Double.parseDouble(parts[1]);
+                    double s = Double.parseDouble(parts[2]);
+                    totalSeconds = h * 3600 + m * 60 + s;
+                    break;
+                }
+            }
+        }
+        process.waitFor();
+        return (int) Math.round(totalSeconds);
     }
 
     public static void main(String[] args) {

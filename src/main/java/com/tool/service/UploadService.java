@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tool.mapper.UploadMapper;
 import com.tool.util.AsyncUtil;
 import com.tool.util.DtxUtils;
+import com.tool.util.Result;
 import com.tool.util.YiYuanSimUtiles;
+import com.tool.vo.BinVO;
 import com.tool.vo.DrumInfo;
 import com.tool.vo.DtxVO;
 import com.tool.vo.TSimcardInfo;
@@ -30,8 +32,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 
-import static com.tool.util.DtxUtils.toEasy;
+import static com.tool.util.DtxUtils.*;
 
 @Service
 public class UploadService {
@@ -632,6 +635,75 @@ public class UploadService {
     }
 
 
+    public Result genHammerModelHand(String outPutPath,
+                                     Integer beginTime,
+                                     Integer endTime,
+                                     Integer songDuration,
+                                     Integer BPM) {
+        BigDecimal begin = BigDecimal.valueOf(beginTime).multiply(BigDecimal.valueOf(100));
+        BigDecimal endPadding = BigDecimal.valueOf(endTime).multiply(BigDecimal.valueOf(100));
+        BigDecimal duration = BigDecimal.valueOf(songDuration).multiply(BigDecimal.valueOf(100));
+        double i1 = 60.0 / BPM;
+        BigDecimal interval = BigDecimal.valueOf(i1)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(3, RoundingMode.HALF_UP);
+        duration = duration.subtract(begin).subtract(endPadding);
+        int loopCount = duration.divide(interval, 0, RoundingMode.FLOOR).intValue();
+        List<BinVO> drumInfoList = new ArrayList<>();
+        List<Integer> result = new ArrayList<>();
+        BigDecimal currentBegin = begin;
+        for (int i = 0; i < loopCount; i++) {
+            BinVO binVO = new BinVO();
+            int weight = randomByWeight();
+            int key = 0;
+            if (weight == 0) {
+                binVO.setIsValue(0);
+            } else {
+                binVO.setIsValue(1);
+                key = getRandomHexSum(weight);
+                binVO.setKeyHigh((byte) ((key >> 8) & 0xFF));
+                binVO.setKeyLow((byte) (key & 0xFF));
+                result.add(key);
+            }
+            int beginTimeValue = currentBegin.intValue();
+            int endTimeValue = currentBegin.add(interval).intValue();
+            binVO.setBeginHigh((byte) ((beginTimeValue >> 8) & 0xFF));
+            binVO.setBeginLow((byte) (beginTimeValue & 0xFF));
+            binVO.setEndHigh((byte) ((endTimeValue >> 8) & 0xFF));
+            binVO.setEndLow((byte) (endTimeValue & 0xFF));
+            drumInfoList.add(binVO);
+            currentBegin = currentBegin.add(interval);
+        }
+        int count = (int) drumInfoList.stream().filter(bin -> bin.getIsValue() != null && bin.getIsValue() == 1).count();
+        byte[] bytes = new byte[count * 6 + 5];
+        bytes[0] = (byte) 0xAA;
+        int realSize = count * 6;
+        bytes[1] = (byte) ((realSize >> 8) & 0xFF);
+        bytes[2] = (byte) (realSize & 0xFF);
+        int index = 3;
+        for (BinVO binVO : drumInfoList) {
+            if (binVO.getIsValue() != null && binVO.getIsValue() == 1) {
+                bytes[index++] = binVO.getBeginHigh();
+                bytes[index++] = binVO.getBeginLow();
+                bytes[index++] = binVO.getEndHigh();
+                bytes[index++] = binVO.getEndLow();
+                bytes[index++] = binVO.getKeyHigh();
+                bytes[index++] = binVO.getKeyLow();
+            }
+        }
+        // 校验码
+        byte check = 0;
+        for (int i = 0; i < index; i++) {
+            check ^= bytes[i];
+        }
+        bytes[index++] = check;
+        bytes[index] = (byte) 0xEE;
+        outPutPath = outPutPath + "\\打地鼠.level1.bin";
+        System.out.println(outPutPath);
+        DtxUtils.saveFile(outPutPath, bytes);
+        System.out.println("保存完成");
+        return Result.success(result);
+    }
 
 
     private static class RawDrumEvent {
@@ -644,118 +716,118 @@ public class UploadService {
         }
     }
 
-    /**
-     * 把上传的 DTX 文件解析成二进制数据并保存成 .bin 文件，整个流程可以这样理解：
-     * <p>
-     * 1. 首先检查上传的文件是否为空，如果为空就直接返回失败。
-     * 2. 读取文件内容，把每一行都拼接成一个完整的字符串。
-     * 3. 从文件内容里提取一些基本信息，比如歌曲标题、全局 BPM 值、以及每个鼓的原始谱面数据。
-     * 4. 对鼓谱数据进行预处理，比如补齐长度，让每一小节的数据长度统一。
-     * 5. 把整个鼓谱横向排列的数据分组，每组包含一定数量的鼓通道。
-     * 6. 再把每组数据纵向重排，也就是把原本每行的鼓谱转换成按时间顺序排列的列表。
-     * 7. 遍历重排后的列表，针对每个时间点：
-     * - 根据前两位判断当前小节的 BPM，如果有变化就更新 BPM。
-     * - 计算这个小节的持续时间（步长）。
-     * - 提取每个鼓的按键信息，筛选出有击打的鼓。
-     * - 生成 DrumInfo 对象，并设置它的开始时间、结束时间、按键信息和响应时间。
-     * - 把 DrumInfo 对象放入一个列表里，方便后续处理。
-     * 8. 遍历 DrumInfo 列表，把每个对象的开始时间、结束时间、按键信息转成字节，高位和低位分别存储。
-     * 9. 把所有的字节按固定顺序依次放入最终的字节数组里。
-     * 10. 最后计算一个校验位（把除了最后两个字节之外的所有字节做异或运算），放到倒数第二位。
-     * 11. 字节数组的最后一位固定写入结束符 0xEE。
-     * 12. 调用保存方法，把字节数组写成 .bin 文件，文件名用歌曲标题，路径用传进来的输出路径。
-     * <p>
-     * * 整体鼓点信息全部处理完了
-     * * 最终格式是
-     * * -
-     * * 02218: 06020202020202020302020202020202
-     * * 0222A: 03030303030303030303030303030303
-     * * 0221B: 02020202020202020202020202020202
-     * * 02225: 02020202020202020202020202020202
-     * * 02222: 02020202020202020202020202020202
-     * * 0221D: 02020202020202020202020202020202
-     * * 02224: 02020202020202020202020202020202
-     * * 0221F: 02020202020202020202020202020202
-     * * 02221: 02020202020202020202020202020202
-     * * 02226: 02020202020202020202020202020202
-     * * 0225D: 02020202020202020202020202020202
-     * * -
-     * * 现在需要的是给转过来，从横向变成纵向，开始造对象给对象赋值
-     * *
-     * * 0 = "0302020202020202020202"
-     * * 1 = "0202020202020202020202"
-     * * 2 = "0202020202020202020202"
-     * * 3 = "0202020202020202020202"
-     * * 4 = "0202020202020202020202"
-     * * 5 = "0202020202020202020202"
-     * * 6 = "0202020202020202020202"
-     * * 7 = "0202020202020202020202"
-     * * 8 = "0202020202020202020202"
-     * * 9 = "0202020202020202020202"
-     * * 10 = "0202020202020202020202"
-     * * 11 = "0202020202020202020202"
-     * * 12 = "0202020202020202020202"
-     * * 13 = "0202020202020202020202"
-     * * 14 = "0202020202020202020202"
-     * * 15 = "0202020202020202020202"
-     * * 16 = "0202020202020202020202"
-     * * 17 = "0202020202020202020202"
-     * * 18 = "0202020202020202020202"
-     * * 19 = "0202020202020202020202"
-     * * 20 = "0202020202020202020202"
-     * * 21 = "0202020202020202020202"
-     * * 22 = "0202020202020202020202"
-     * * 23 = "0202020202020202020202"
-     * * 24 = "0202020202020202020202"
-     * * 25 = "0202020202020202020202"
-     * * 26 = "0202020202020202020202"
-     * * 27 = "0202020202020202020202"
-     * * 28 = "0202020202020202020202"
-     * * 29 = "0202020202020202020202"
-     * * 30 = "0202020202020202020202"
-     * * 31 = "0202020202020202020202"
-     * * 32 = "0202020202020202020202"
-     * * 33 = "0202020202020202020202"
-     * * 34 = "0202020202020202020202"
-     * * 35 = "0202020202020202020202"
-     * * 36 = "0202020202020202020202"
-     * * 37 = "0202020202020202020202"
-     * * 38 = "0202020202020202020202"
-     * * 39 = "0202020202020202020202"
-     * * 40 = "0202020202020202020202"
-     * * 41 = "0202020202020202020202"
-     * * 42 = "0202020202020202020202"
-     * * 43 = "0202020202020202020202"
-     * * 44 = "0202020202020202020202"
-     * * 45 = "0202020202020202020202"
-     * * 46 = "0202020202020202020202"
-     * * 47 = "0202020202020202020202"
-     * * 48 = "0203030303030303030303"
-     * * 49 = "0203030303030303030303"
-     * * 50 = "0203030303030303030303"
-     * * 51 = "0203030303030303030303"
-     * * 52 = "0203030303030303030303"
-     * * 53 = "0203030303030303030303"
-     * * 54 = "0203030303030303030303"
-     * * 55 = "0203030303030303030303"
-     * * 56 = "0203030303030303030303"
-     * * 57 = "0203030303030303030303"
-     * * 58 = "0203030303030303030303"
-     * * 59 = "0203030303030303030303"
-     * * 60 = "0203030303030303030303"
-     * * 61 = "0203030303030303030303"
-     * * 62 = "0203030303030303030303"
-     * * 63 = "0203030303030303030303"
-     * *
-     * 不考虑bgm，不考虑bg图，不考虑音源，只处理鼓点数据
-     * 0 = {DrumInfo@8126} "DrumInfo(beginTIme=0.0000, intervalTime=0.125000, key=1023, endTIme=0.125000)"
-     * 1 = {DrumInfo@8042} "DrumInfo(beginTIme=0.500000, intervalTime=0.125000, key=31, endTIme=0.625000)"
-     * 2 = {DrumInfo@8093} "DrumInfo(beginTIme=0.625000, intervalTime=0.125000, key=31, endTIme=0.750000)"
-     * 3 = {DrumInfo@8127} "DrumInfo(beginTIme=2.000000, intervalTime=0.125000, key=1023, endTIme=2.125000)"
-     * 4 = {DrumInfo@8128} "DrumInfo(beginTIme=4.000000, intervalTime=0.125000, key=1023, endTIme=4.125000)"
-     * 5 = {DrumInfo@8129} "DrumInfo(beginTIme=6.000000, intervalTime=0.125000, key=1023, endTIme=6.125000)"
-     * 6 = {DrumInfo@8130} "DrumInfo(beginTIme=8.000000, intervalTime=0.125000, key=1023, endTIme=8.125000)"
-     */
+/**
+ * 把上传的 DTX 文件解析成二进制数据并保存成 .bin 文件，整个流程可以这样理解：
+ * <p>
+ * 1. 首先检查上传的文件是否为空，如果为空就直接返回失败。
+ * 2. 读取文件内容，把每一行都拼接成一个完整的字符串。
+ * 3. 从文件内容里提取一些基本信息，比如歌曲标题、全局 BPM 值、以及每个鼓的原始谱面数据。
+ * 4. 对鼓谱数据进行预处理，比如补齐长度，让每一小节的数据长度统一。
+ * 5. 把整个鼓谱横向排列的数据分组，每组包含一定数量的鼓通道。
+ * 6. 再把每组数据纵向重排，也就是把原本每行的鼓谱转换成按时间顺序排列的列表。
+ * 7. 遍历重排后的列表，针对每个时间点：
+ * - 根据前两位判断当前小节的 BPM，如果有变化就更新 BPM。
+ * - 计算这个小节的持续时间（步长）。
+ * - 提取每个鼓的按键信息，筛选出有击打的鼓。
+ * - 生成 DrumInfo 对象，并设置它的开始时间、结束时间、按键信息和响应时间。
+ * - 把 DrumInfo 对象放入一个列表里，方便后续处理。
+ * 8. 遍历 DrumInfo 列表，把每个对象的开始时间、结束时间、按键信息转成字节，高位和低位分别存储。
+ * 9. 把所有的字节按固定顺序依次放入最终的字节数组里。
+ * 10. 最后计算一个校验位（把除了最后两个字节之外的所有字节做异或运算），放到倒数第二位。
+ * 11. 字节数组的最后一位固定写入结束符 0xEE。
+ * 12. 调用保存方法，把字节数组写成 .bin 文件，文件名用歌曲标题，路径用传进来的输出路径。
+ * <p>
+ * * 整体鼓点信息全部处理完了
+ * * 最终格式是
+ * * -
+ * * 02218: 06020202020202020302020202020202
+ * * 0222A: 03030303030303030303030303030303
+ * * 0221B: 02020202020202020202020202020202
+ * * 02225: 02020202020202020202020202020202
+ * * 02222: 02020202020202020202020202020202
+ * * 0221D: 02020202020202020202020202020202
+ * * 02224: 02020202020202020202020202020202
+ * * 0221F: 02020202020202020202020202020202
+ * * 02221: 02020202020202020202020202020202
+ * * 02226: 02020202020202020202020202020202
+ * * 0225D: 02020202020202020202020202020202
+ * * -
+ * * 现在需要的是给转过来，从横向变成纵向，开始造对象给对象赋值
+ * *
+ * * 0 = "0302020202020202020202"
+ * * 1 = "0202020202020202020202"
+ * * 2 = "0202020202020202020202"
+ * * 3 = "0202020202020202020202"
+ * * 4 = "0202020202020202020202"
+ * * 5 = "0202020202020202020202"
+ * * 6 = "0202020202020202020202"
+ * * 7 = "0202020202020202020202"
+ * * 8 = "0202020202020202020202"
+ * * 9 = "0202020202020202020202"
+ * * 10 = "0202020202020202020202"
+ * * 11 = "0202020202020202020202"
+ * * 12 = "0202020202020202020202"
+ * * 13 = "0202020202020202020202"
+ * * 14 = "0202020202020202020202"
+ * * 15 = "0202020202020202020202"
+ * * 16 = "0202020202020202020202"
+ * * 17 = "0202020202020202020202"
+ * * 18 = "0202020202020202020202"
+ * * 19 = "0202020202020202020202"
+ * * 20 = "0202020202020202020202"
+ * * 21 = "0202020202020202020202"
+ * * 22 = "0202020202020202020202"
+ * * 23 = "0202020202020202020202"
+ * * 24 = "0202020202020202020202"
+ * * 25 = "0202020202020202020202"
+ * * 26 = "0202020202020202020202"
+ * * 27 = "0202020202020202020202"
+ * * 28 = "0202020202020202020202"
+ * * 29 = "0202020202020202020202"
+ * * 30 = "0202020202020202020202"
+ * * 31 = "0202020202020202020202"
+ * * 32 = "0202020202020202020202"
+ * * 33 = "0202020202020202020202"
+ * * 34 = "0202020202020202020202"
+ * * 35 = "0202020202020202020202"
+ * * 36 = "0202020202020202020202"
+ * * 37 = "0202020202020202020202"
+ * * 38 = "0202020202020202020202"
+ * * 39 = "0202020202020202020202"
+ * * 40 = "0202020202020202020202"
+ * * 41 = "0202020202020202020202"
+ * * 42 = "0202020202020202020202"
+ * * 43 = "0202020202020202020202"
+ * * 44 = "0202020202020202020202"
+ * * 45 = "0202020202020202020202"
+ * * 46 = "0202020202020202020202"
+ * * 47 = "0202020202020202020202"
+ * * 48 = "0203030303030303030303"
+ * * 49 = "0203030303030303030303"
+ * * 50 = "0203030303030303030303"
+ * * 51 = "0203030303030303030303"
+ * * 52 = "0203030303030303030303"
+ * * 53 = "0203030303030303030303"
+ * * 54 = "0203030303030303030303"
+ * * 55 = "0203030303030303030303"
+ * * 56 = "0203030303030303030303"
+ * * 57 = "0203030303030303030303"
+ * * 58 = "0203030303030303030303"
+ * * 59 = "0203030303030303030303"
+ * * 60 = "0203030303030303030303"
+ * * 61 = "0203030303030303030303"
+ * * 62 = "0203030303030303030303"
+ * * 63 = "0203030303030303030303"
+ * *
+ * 不考虑bgm，不考虑bg图，不考虑音源，只处理鼓点数据
+ * 0 = {DrumInfo@8126} "DrumInfo(beginTIme=0.0000, intervalTime=0.125000, key=1023, endTIme=0.125000)"
+ * 1 = {DrumInfo@8042} "DrumInfo(beginTIme=0.500000, intervalTime=0.125000, key=31, endTIme=0.625000)"
+ * 2 = {DrumInfo@8093} "DrumInfo(beginTIme=0.625000, intervalTime=0.125000, key=31, endTIme=0.750000)"
+ * 3 = {DrumInfo@8127} "DrumInfo(beginTIme=2.000000, intervalTime=0.125000, key=1023, endTIme=2.125000)"
+ * 4 = {DrumInfo@8128} "DrumInfo(beginTIme=4.000000, intervalTime=0.125000, key=1023, endTIme=4.125000)"
+ * 5 = {DrumInfo@8129} "DrumInfo(beginTIme=6.000000, intervalTime=0.125000, key=1023, endTIme=6.125000)"
+ * 6 = {DrumInfo@8130} "DrumInfo(beginTIme=8.000000, intervalTime=0.125000, key=1023, endTIme=8.125000)"
+ */
 
     /**
      * @Description：反编译Bin文件
@@ -787,7 +859,8 @@ public class UploadService {
             int lengthLow = bytes[2] & 0xFF;
             int dataLength = (lengthHigh << 8) | lengthLow;
             int expectedLength = dataLength + 5;
-
+            System.out.println("dataLength" + dataLength);
+            System.out.println("length" + bytes.length);
             if (expectedLength != bytes.length) {
                 System.out.println("长度不一致，文件可能损坏");
                 return false;
@@ -1101,6 +1174,76 @@ public class UploadService {
         return true;
     }
 
+    public Result genHammerModel(String outPutPath,
+                                 Integer beginTime,
+                                 Integer endTime,
+                                 Integer songDuration,
+                                 Integer BPM,
+                                 String title) {
+        BigDecimal begin = BigDecimal.valueOf(beginTime).multiply(BigDecimal.valueOf(100));
+        BigDecimal endPadding = BigDecimal.valueOf(endTime).multiply(BigDecimal.valueOf(100));
+        BigDecimal duration = BigDecimal.valueOf(songDuration).multiply(BigDecimal.valueOf(100));
+        double i1 = 60.0 / BPM;
+        BigDecimal interval = BigDecimal.valueOf(i1)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(3, RoundingMode.HALF_UP);
+        duration = duration.subtract(begin).subtract(endPadding);
+        int loopCount = duration.divide(interval, 0, RoundingMode.FLOOR).intValue();
+        List<BinVO> drumInfoList = new ArrayList<>();
+        List<Integer> result = new ArrayList<>();
+        BigDecimal currentBegin = begin;
+        for (int i = 0; i < loopCount; i++) {
+            BinVO binVO = new BinVO();
+            int weight = randomByWeight();
+            int key = 0;
+            if (weight == 0) {
+                binVO.setIsValue(0);
+            } else {
+                binVO.setIsValue(1);
+                key = getRandomHexSum(weight);
+                binVO.setKeyHigh((byte) ((key >> 8) & 0xFF));
+                binVO.setKeyLow((byte) (key & 0xFF));
+                result.add(key);
+            }
+            int beginTimeValue = currentBegin.intValue();
+            int endTimeValue = currentBegin.add(interval).intValue();
+            binVO.setBeginHigh((byte) ((beginTimeValue >> 8) & 0xFF));
+            binVO.setBeginLow((byte) (beginTimeValue & 0xFF));
+            binVO.setEndHigh((byte) ((endTimeValue >> 8) & 0xFF));
+            binVO.setEndLow((byte) (endTimeValue & 0xFF));
+            drumInfoList.add(binVO);
+            currentBegin = currentBegin.add(interval);
+        }
+        int count = (int) drumInfoList.stream().filter(bin -> bin.getIsValue() != null && bin.getIsValue() == 1).count();
+        byte[] bytes = new byte[count * 6 + 5];
+        bytes[0] = (byte) 0xAA;
+        int realSize = count * 6;
+        bytes[1] = (byte) ((realSize >> 8) & 0xFF);
+        bytes[2] = (byte) (realSize & 0xFF);
+        int index = 3;
+        for (BinVO binVO : drumInfoList) {
+            if (binVO.getIsValue() != null && binVO.getIsValue() == 1) {
+                bytes[index++] = binVO.getBeginHigh();
+                bytes[index++] = binVO.getBeginLow();
+                bytes[index++] = binVO.getEndHigh();
+                bytes[index++] = binVO.getEndLow();
+                bytes[index++] = binVO.getKeyHigh();
+                bytes[index++] = binVO.getKeyLow();
+            }
+        }
+        byte check = 0;
+        for (int i = 0; i < index; i++) {
+            check ^= bytes[i];
+        }
+        bytes[index++] = check;
+        bytes[index] = (byte) 0xEE;
+        outPutPath = outPutPath + File.separator + title + "_level1.bin";
+        DtxUtils.saveFile(outPutPath, bytes);
+        System.out.println("保存完成");
+        return Result.success(result);
+    }
+
+
     public static void main(String[] args) throws IOException {
 
         // 歌曲编号映射文件
@@ -1166,4 +1309,153 @@ public class UploadService {
             }
         }
     }
+
+    public Boolean hammerInvertDtxFile(MultipartFile file, String outPutPath) {
+        if (file == null || file.isEmpty()) {
+            System.err.println("上传的文件为空");
+            return false;
+        }
+        String originalName = file.getOriginalFilename();
+        String fileName = originalName.substring(0, originalName.lastIndexOf('.'));
+        try {
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line).append("\n");
+                }
+            }
+            String fileContent = sb.toString();
+            String title = DtxUtils.extractTitle(fileContent);
+            List<Double> bpmInfo = DtxUtils.extractBpmMap(fileContent);
+            List<String> drumInfo = DtxUtils.extractDrumLines(fileContent);
+            for (int i = 0; i < drumInfo.size(); i++) {
+                drumInfo.set(i, DtxUtils.paddedDrumInfo(drumInfo.get(i)));
+            }
+            List<String> finalDrumList = DtxUtils.populateData(drumInfo);
+            int groupSize = 11;
+            List<List<String>> grouped = new ArrayList<>();
+            for (int i = 0; i < finalDrumList.size(); i += groupSize) {
+                int end = Math.min(i + groupSize, finalDrumList.size());
+                grouped.add(finalDrumList.subList(i, end));
+            }
+            List<String> newDrumList = DtxUtils.reGroupDrumInfo(grouped);
+            List<RawDrumEvent> rawDrumEventList = new ArrayList<>();
+            Double currentBpmValue = bpmInfo.get(0); // 初始bpm的值
+            BigDecimal currentBeginTime = new BigDecimal(0).setScale(4, RoundingMode.HALF_UP);
+            for (String everyDrumInfo : newDrumList) {
+                String bpmSubValue = everyDrumInfo.substring(0, 2);
+                if (!bpmSubValue.equals("02") && !bpmSubValue.equals("01") && !bpmSubValue.equals("00")) {
+                    int bpmIndex = DtxUtils.getNumberMap(bpmSubValue);
+                    currentBpmValue = bpmInfo.get(bpmIndex);
+                }
+                // 计算当前格子的时长
+                BigDecimal stepTime = DtxUtils.calculateDrumTime(currentBpmValue);
+                // 按键信息
+                everyDrumInfo = everyDrumInfo.substring(2);
+                String[] channels = {"2A", "1B", "25", "22", "1D", "24", "1F", "21", "26", "5D"};
+                // 判断此格是否“全是 02”
+                if (!everyDrumInfo.equals("02020202020202020202")) {
+                    List<Integer> non02List = new ArrayList<>();
+                    List<String> parts = new ArrayList<>();
+                    for (int i = 0; i < everyDrumInfo.length(); i += 2) {
+                        parts.add(everyDrumInfo.substring(i, i + 2));
+                    }
+                    for (int i = 0; i < parts.size(); i++) {
+                        if (!"02".equals(parts.get(i))) {
+                            non02List.add(i);
+                        }
+                    }
+                    //计算当前格子的鼓键 KEY
+                    Integer drumNumSum = 0;
+                    for (Integer i : non02List) {
+                        Integer drumNumberByChannel = DtxUtils.getDrumNumberByChannel(channels[i]);
+                        drumNumSum += drumNumberByChannel;
+                    }
+                    // 将事件加入原始列表，此处一个格子只产生一个事件（多键位叠加）
+                    rawDrumEventList.add(new RawDrumEvent(drumNumSum, currentBeginTime));
+                }
+                // 一行处理完后，起始时间推进
+                currentBeginTime = currentBeginTime.add(stepTime);
+            }
+            // 根据下一个同键事件计算 EndTime 和 IntervalTime
+            List<DrumInfo> drumInfoArrayList = new ArrayList<>();
+            BigDecimal oneSecond = new BigDecimal(1.0).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal oneCentisecond = new BigDecimal(0.01).setScale(4, RoundingMode.HALF_UP);
+            for (int i = 0; i < rawDrumEventList.size(); i++) {
+                RawDrumEvent currentEvent = rawDrumEventList.get(i);
+                DrumInfo drum = new DrumInfo();
+                drum.setKey(currentEvent.key);
+                drum.setBeginTIme(currentEvent.beginTime);
+                BigDecimal nextBeginTime = null;
+                // 查找下一个同键事件
+                for (int j = i + 1; j < rawDrumEventList.size(); j++) {
+                    RawDrumEvent nextEvent = rawDrumEventList.get(j);
+                    if (nextEvent.key.equals(currentEvent.key)) {
+                        nextBeginTime = nextEvent.beginTime;
+                        break;
+                    }
+                }
+                BigDecimal endTime;
+                if (nextBeginTime != null) {
+                    // 找到了下一个同键事件
+                    BigDecimal timeDifference = nextBeginTime.subtract(currentEvent.beginTime);
+                    // 如果间隔 > 1.0s, 则 endTime = beginTime + 1.0s
+                    if (timeDifference.compareTo(oneSecond) > 0) {
+                        endTime = currentEvent.beginTime.add(oneSecond);
+                    } else {
+                        // 如果间隔 <= 1.0s, 则 endTime = nextBeginTime - 0.01s
+                        endTime = nextBeginTime.subtract(oneCentisecond);
+                    }
+                } else {
+                    // 当前是该键的最后一个事件，默认 endTime = beginTime + 1.0s
+                    endTime = currentEvent.beginTime.add(oneSecond);
+                }
+                drum.setEndTIme(endTime);
+                // 重新计算 intervalTime
+                drum.setIntervalTime(drum.getEndTIme().subtract(drum.getBeginTIme()));
+                drumInfoArrayList.add(drum);
+            }
+            byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
+            int size = drumInfoArrayList.size();
+            int realSize = size * 6;
+            byte numHigh = (byte) ((realSize >> 8) & 0xFF);
+            byte numLow = (byte) (realSize & 0xFF);
+            bytes[0] = (byte) 0xAA;
+            bytes[1] = numHigh;
+            bytes[2] = numLow;
+            int index = 3;
+            for (DrumInfo info : drumInfoArrayList) {
+                BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal end = info.getEndTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                int key = info.getKey();
+                int beginTimeValue = begin.intValue();
+                int endTimeValue = end.intValue();
+                byte beginHigh = (byte) ((beginTimeValue >> 8) & 0xFF);
+                byte beginLow = (byte) (beginTimeValue & 0xFF);
+                byte endHigh = (byte) ((endTimeValue >> 8) & 0xFF);
+                byte endLow = (byte) (endTimeValue & 0xFF);
+                byte keyHigh = (byte) ((key >> 8) & 0xFF);
+                byte keyLow = (byte) (key & 0xFF);
+                bytes[index++] = beginHigh;
+                bytes[index++] = beginLow;
+                bytes[index++] = endHigh;
+                bytes[index++] = endLow;
+                bytes[index++] = keyHigh;
+                bytes[index++] = keyLow;
+            }
+            byte check = 0;
+            for (int i = 0; i < bytes.length - 2; i++) {
+                check = (byte) (check ^ bytes[i]);
+            }
+            bytes[index++] = check;
+            bytes[index] = (byte) 0xEE;
+            DtxUtils.saveFile(outPutPath, bytes);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 }

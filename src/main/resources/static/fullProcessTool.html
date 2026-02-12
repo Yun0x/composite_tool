@@ -3,221 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>一键化全流程处理</title>
+    <title>智能音频全流程 - Aurora Glass</title>
     <style>
         :root {
-            --primary: #ceb9ff;
-            --primary-hover: #f1e9ff;
-            --bg: #f5f9ff;
-            --card-bg: rgba(255, 255, 255, 0.85);
-            --border: rgba(0, 0, 0, 0.1);
-            --text-main: #111827;
-            --text-dim: #4b5563;
-            --success: #22c55e;
-            --error: #ef4444;
-            --warning: #facc15;
+            --glass: rgba(255, 255, 255, 0.5);
+            --glass-deep: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --primary: #8e2de2;
+            --secondary: #4a00e0;
+            --accent: #00d2ff;
+            --text: #2d3436;
+            --text-dim: #636e72;
+            --success: #00b894;
+            --error: #ff7675;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text-main);
+            font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
             height: 100vh;
             width: 100vw;
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            color: var(--text);
+            /* 动态弥散背景 */
+            background: linear-gradient(45deg, #f3f7ff, #fdfcfb);
+            position: relative;
         }
 
-        .glass-card {
-            width: 100%;
-            max-width: 900px; /* 增加最大宽度 */
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        /* 弥散光球背景动效 */
+        body::before, body::after {
+            content: "";
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.4;
+            animation: move 20s infinite alternate;
+        }
+
+        body::before {
+            background: var(--accent);
+            top: -10%;
+            left: -10%;
+        }
+
+        body::after {
+            background: var(--primary);
+            bottom: -10%;
+            right: -10%;
+            animation-delay: -5s;
+        }
+
+        @keyframes move {
+            from {
+                transform: translate(0, 0) scale(1);
+            }
+            to {
+                transform: translate(100px, 100px) scale(1.2);
+            }
+        }
+
+        .main-container {
+            width: 90%;
+            max-width: 1100px;
+            height: 85vh;
+            background: var(--glass);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: 40px;
+            box-shadow: 0 40px 100px rgba(0, 0, 0, 0.05);
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            overflow: hidden;
+            animation: containerIn 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        @keyframes containerIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* 左侧配置面板 */
+        .sidebar {
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.3);
+            border-right: 1px solid var(--glass-border);
             display: flex;
             flex-direction: column;
-            max-height: 95vh;
+            gap: 24px;
         }
 
-        header { text-align: center; margin-bottom: 20px; flex-shrink: 0; }
-        header h1 { font-size: 20px; font-weight: 700; color: white; }
-        header p { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+        header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 5px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-        /* 统一上传区域 */
+        header p {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
         .drop-zone {
-            border: 2px dashed #475569;
-            border-radius: 16px;
-            padding: 24px;
+            padding: 30px 20px;
+            border: 2px dashed var(--glass-border);
+            border-radius: 24px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(15, 23, 42, 0.4);
-            margin-bottom: 16px;
-            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .drop-zone:hover, .drop-zone.drag-over {
+        .drop-zone:hover {
+            background: white;
             border-color: var(--primary);
-            background: rgba(139, 92, 246, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05);
         }
 
         .drop-zone svg {
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             fill: var(--primary);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            opacity: 0.8;
         }
 
-        .file-hint { font-size: 12px; color: var(--text-dim); }
-
-        /* 参数设置表单 */
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
-            flex-shrink: 0;
+        .drop-zone span {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
         }
 
-        .input-group { display: flex; flex-direction: column; gap: 6px; }
-        .input-group.full { grid-column: span 2; }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
-        label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; }
+        .form-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-left: 5px;
+        }
 
         input {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            color: white;
-            font-size: 13px;
-            outline: none;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 12px 16px;
+            font-size: 14px;
+            transition: all 0.3s;
+            color: var(--text);
         }
-        input:focus { border-color: var(--primary); }
 
-        /* 配对列表区域 */
-        .queue-header {
-            font-size: 12px;
-            color: var(--text-dim);
-            margin-bottom: 8px;
+        input:focus {
+            outline: none;
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(142, 45, 226, 0.1);
+        }
+
+        .btn-run {
+            margin-top: auto;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.4s;
+            box-shadow: 0 10px 25px rgba(74, 0, 224, 0.2);
+        }
+
+        .btn-run:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(74, 0, 224, 0.3);
+            filter: brightness(1.1);
+        }
+
+        .btn-run:disabled {
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        /* 右侧列表区域 */
+        .content {
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .list-header {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .list-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .badge-count {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
         }
 
         .queue-list {
-            flex-grow: 1;
+            flex: 1;
             overflow-y: auto;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--border);
-            margin-bottom: 16px;
-            min-height: 100px;
+            padding-right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
+        /* 列表项玻璃卡片 */
         .queue-item {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.4);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 24px;
+            display: grid;
+            grid-template-columns: 50px 1fr auto;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.3s;
+            animation: itemIn 0.5s ease backwards;
+        }
+
+        .queue-item:hover {
+            background: rgba(255, 255, 255, 0.8);
+            transform: scale(1.01) translateX(5px);
+        }
+
+        @keyframes itemIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .file-icon {
+            width: 44px;
+            height: 44px;
+            background: white;
+            border-radius: 14px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            font-size: 13px;
-            transition: background 0.2s;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
         }
 
-        .queue-item:last-child { border-bottom: none; }
-        .queue-item:hover { background: rgba(255, 255, 255, 0.05); }
+        .file-details h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
 
-        .file-info { display: flex; flex-direction: column; gap: 2px; }
-        .file-name { font-weight: 500; color: #fff; }
-        .file-match { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
-
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(255, 255, 255, 0.1);
+        .file-details p {
+            font-size: 12px;
             color: var(--text-dim);
-            min-width: 60px;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .status-badge.ready { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-        .status-badge.warning { background: rgba(234, 179, 8, 0.2); color: #facc15; }
-        .status-badge.success { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
-        .status-badge.error { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
-
-        button {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            flex-shrink: 0;
+        .status-pill {
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
         }
-        button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .status-pill.ready {
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--accent);
+            border-color: rgba(0, 210, 255, 0.2);
+        }
+
+        .status-pill.success {
+            background: rgba(0, 184, 148, 0.1);
+            color: var(--success);
+        }
+
+        .status-pill.error {
+            background: rgba(255, 118, 117, 0.1);
+            color: var(--error);
+        }
+
+        .status-pill.loading {
+            background: white;
+            color: var(--primary);
+            animation: glow 1.5s infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 5px rgba(142, 45, 226, 0.2);
+                opacity: 0.8;
+            }
+            to {
+                box-shadow: 0 0 20px rgba(142, 45, 226, 0.5);
+                opacity: 1;
+            }
+        }
 
         /* 滚动条 */
-        .queue-list::-webkit-scrollbar { width: 4px; }
-        .queue-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        .queue-list::-webkit-scrollbar {
+            width: 5px;
+        }
 
-        #fileInput { display: none; }
+        .queue-list::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 10px;
+        }
+
+        #fileInput {
+            display: none;
+        }
     </style>
 </head>
 <body>
 
-<div class="glass-card">
-    <header>
-        <h1>MP3 + DTX 智能处理</h1>
-        <p>自动根据文件名配对并批量上传</p>
-    </header>
+<div class="main-container">
+    <aside class="sidebar">
+        <header>
+            <h1>一键生成全套内容</h1>
+            <p>bin+dtx+反编译内容</p>
+        </header>
 
-    <div class="drop-zone" id="dropZone">
-        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        <div style="font-weight: 600; margin-bottom: 4px;">点击或拖拽所有文件至此</div>
-        <div class="file-hint">支持 MP3 和 DTX 混合上传，自动合并</div>
-        <input type="file" id="fileInput" accept=".mp3,.dtx" multiple>
-    </div>
+        <div class="drop-zone" id="dropZone">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+            </svg>
+            <span>点选或拖入所有文件</span>
+            <p style="font-size: 11px; color: var(--text-dim); margin-top: 5px;">必须同时有dtx和mp3</p>
+            <input type="file" id="fileInput" multiple accept=".mp3,.dtx">
+        </div>
 
-    <div class="form-grid">
-        <div class="input-group">
-            <label>高潮起始 (秒)</label>
-            <input type="number" id="startSecond" placeholder="0" min="0">
+        <div class="form-group">
+            <label>预览起始 (秒)</label>
+            <input type="number" id="startSecond" placeholder="0" value="0">
         </div>
-        <div class="input-group">
-            <label>高潮时长 (秒)</label>
-            <input type="number" id="duration" placeholder="不截取" min="1">
+
+        <div class="form-group">
+            <label>持续时长 (秒)</label>
+            <input type="number" id="duration" placeholder="不截取" value="">
         </div>
-        <div class="input-group full">
+
+        <div class="form-group">
             <label>输出目录</label>
-            <input type="text" id="outputDir" placeholder="例如：C:\Users\Admin\Desktop\TestSong\正式歌曲"  value="C:\Users\Admin\Desktop\TestSong\正式歌曲">
+            <input type="text" id="outputDir" value="C:\Users\Admin\Desktop\TestSong\正式歌曲">
         </div>
-    </div>
 
-    <div class="queue-header">
-        <span>待处理队列</span>
-        <span id="queueCount">0 组</span>
-    </div>
-    <div class="queue-list" id="queueList">
-        <div style="padding: 20px; text-align: center; color: var(--text-dim); font-size: 12px;">
-            请先选择文件
+        <button class="btn-run" id="submitBtn" disabled>开始批量执行</button>
+    </aside>
+
+    <main class="content">
+        <div class="list-header">
+            <h2>待处理序列</h2>
+            <span class="badge-count" id="queueCount">0 组对齐</span>
         </div>
-    </div>
 
-    <button id="submitBtn">开始批量处理</button>
+        <div class="queue-list" id="queueList">
+            <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); opacity: 0.6;">
+                <svg style="width: 80px; height: 80px; fill: #dfe6e9; margin-bottom: 20px;" viewBox="0 0 24 24">
+                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+                <p>等待导入mp3和dtx</p>
+            </div>
+        </div>
+    </main>
 </div>
 
 <script>
@@ -227,164 +423,106 @@
     const queueCount = document.getElementById('queueCount');
     const btn = document.getElementById('submitBtn');
 
-    let processingQueue = []; // 存储配对好的对象 { mp3: File, dtx: File, id: string, status: string }
+    let processingQueue = [];
 
-    // 1. 拖拽与选择逻辑
     dropZone.onclick = () => fileInput.click();
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); };
-    dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
+    dropZone.ondragover = (e) => {
+        e.preventDefault();
+        dropZone.style.background = "white";
+    };
+    dropZone.ondragleave = () => dropZone.style.background = "rgba(255,255,255,0.2)";
     dropZone.ondrop = (e) => {
         e.preventDefault();
-        dropZone.classList.remove('drag-over');
+        dropZone.style.background = "rgba(255,255,255,0.2)";
         handleFiles(e.dataTransfer.files);
     };
     fileInput.onchange = (e) => handleFiles(e.target.files);
 
-    // 2. 核心配对逻辑
+    // --- 核心智能配对逻辑 ---
     function handleFiles(fileList) {
-        if (!fileList || fileList.length === 0) return;
-
         const files = Array.from(fileList);
         const mp3s = files.filter(f => f.name.toLowerCase().endsWith('.mp3'));
         const dtxs = files.filter(f => f.name.toLowerCase().endsWith('.dtx'));
 
-        processingQueue = []; // 重置队列
-
-        // 以 MP3 为主键进行遍历匹配
-        mp3s.forEach(mp3 => {
-            const baseName = mp3.name.substring(0, mp3.name.lastIndexOf('.'));
-            // 寻找同名的 DTX (忽略大小写)
-            const matchedDtx = dtxs.find(dtx => {
-                const dtxBase = dtx.name.substring(0, dtx.name.lastIndexOf('.'));
-                return dtxBase.toLowerCase() === baseName.toLowerCase();
-            });
-
-            processingQueue.push({
+        processingQueue = mp3s.map(mp3 => {
+            const base = mp3.name.substring(0, mp3.name.lastIndexOf('.'));
+            const matchedDtx = dtxs.find(d => d.name.substring(0, d.name.lastIndexOf('.')).toLowerCase() === base.toLowerCase());
+            return {
                 id: Math.random().toString(36).substr(2, 9),
-                mp3: mp3,
-                dtx: matchedDtx || null, // 可能没找到
+                mp3,
+                dtx: matchedDtx || null,
                 status: matchedDtx ? 'ready' : 'missing'
-            });
+            };
         });
 
         renderQueue();
     }
 
-    // 3. 渲染列表
     function renderQueue() {
-        queueCount.innerText = `${processingQueue.length} 组`;
+        queueCount.innerText = `${processingQueue.length} 组对齐`;
+        btn.disabled = processingQueue.length === 0;
 
-        if (processingQueue.length === 0) {
-            queueList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-dim); font-size: 12px;">请先选择文件</div>';
-            return;
-        }
+        if (processingQueue.length === 0) return;
 
         queueList.innerHTML = '';
-        processingQueue.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'queue-item';
-            div.id = `item-${item.id}`;
+        processingQueue.forEach((item, idx) => {
+            const el = document.createElement('div');
+            el.className = 'queue-item';
+            el.id = `item-${item.id}`;
+            el.style.animationDelay = `${idx * 0.1}s`;
 
-            let statusBadge = '';
-            let subText = '';
+            const statusClass = item.status === 'ready' ? 'ready' : 'error';
+            const statusText = item.status === 'ready' ? 'Ready' : 'Missing DTX';
 
-            if (item.status === 'ready') {
-                statusBadge = `<span class="status-badge ready">就绪</span>`;
-                subText = `<span style="color:#60a5fa">✔ 已匹配: ${item.dtx.name}</span>`;
-            } else if (item.status === 'missing') {
-                statusBadge = `<span class="status-badge warning">缺少DTX</span>`;
-                subText = `<span style="color:#fb7185">✖ 未找到同名 DTX 文件</span>`;
-            }
-
-            div.innerHTML = `
-                <div class="file-info">
-                    <div class="file-name">${item.mp3.name}</div>
-                    <div class="file-match">${subText}</div>
+            el.innerHTML = `
+                <div class="file-icon">
+                    <svg style="width:24px; height:24px; fill:var(--primary)" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                 </div>
-                ${statusBadge}
+                <div class="file-details">
+                    <h4>${item.mp3.name}</h4>
+                    <p>${item.dtx ? '✅ ' + item.dtx.name : '❌ 未找到同名谱面'}</p>
+                </div>
+                <div class="status-pill ${statusClass}">${statusText}</div>
             `;
-            queueList.appendChild(div);
+            queueList.appendChild(el);
         });
     }
 
-    // 4. 更新单行状态
-    function updateItemStatus(id, type, msg) {
-        const itemEl = document.getElementById(`item-${id}`);
-        if (!itemEl) return;
-        const badge = itemEl.querySelector('.status-badge');
-
-        if (type === 'processing') {
-            badge.className = 'status-badge ready';
-            badge.innerText = '处理中...';
-            badge.style.color = '#fff';
-        } else if (type === 'success') {
-            badge.className = 'status-badge success';
-            badge.innerText = '成功';
-        } else {
-            badge.className = 'status-badge error';
-            badge.innerText = msg || '失败';
-        }
-    }
-
-    // 5. 提交处理
     btn.onclick = async () => {
-        if (processingQueue.length === 0) {
-            alert('请先添加文件');
-            return;
-        }
-
-        // 检查是否有缺失 DTX 的项目
-        const hasMissing = processingQueue.some(p => !p.dtx);
-        if (hasMissing) {
-            if (!confirm('部分 MP3 缺少对应的 DTX 文件，这些文件将被跳过。是否继续？')) {
-                return;
-            }
-        }
-
-        const validItems = processingQueue.filter(p => p.dtx);
-        if (validItems.length === 0) {
-            alert('没有完整的配对文件可供处理');
-            return;
-        }
-
-        const outputDir = document.getElementById('outputDir').value;
-        const startSecond = document.getElementById('startSecond').value || 0;
-        const duration = document.getElementById('duration').value || 0;
+        const validItems = processingQueue.filter(i => i.status === 'ready');
+        if (!validItems.length) return;
 
         btn.disabled = true;
-        btn.innerText = '正在批量处理...';
+        btn.innerText = '正在引擎化执行...';
 
         for (const item of validItems) {
-            updateItemStatus(item.id, 'processing');
+            const el = document.getElementById(`item-${item.id}`);
+            const pill = el.querySelector('.status-pill');
+            pill.className = 'status-pill loading';
+            pill.innerText = 'Processing';
 
-            const formData = new FormData();
-            formData.append('file', item.mp3);
-            formData.append('dtx', item.dtx);
-            formData.append('outputDir', outputDir);
-            formData.append('startSecond', startSecond);
-            formData.append('duration', duration);
+            const fd = new FormData();
+            fd.append('file', item.mp3);
+            fd.append('dtx', item.dtx);
+            fd.append('outputDir', document.getElementById('outputDir').value);
+            fd.append('startSecond', document.getElementById('startSecond').value);
+            fd.append('duration', document.getElementById('duration').value);
 
             try {
-                const res = await fetch('http://localhost:9001/tool/fullProcess', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('http://localhost:9001/tool/fullProcess', {method: 'POST', body: fd});
                 const data = await res.json();
 
-                if (data.code === 200) {
-                    updateItemStatus(item.id, 'success');
-                } else {
-                    updateItemStatus(item.id, 'error', data.msg);
-                }
+                pill.className = data.code === 200 ? 'status-pill success' : 'status-pill error';
+                pill.innerText = data.code === 200 ? 'Finished' : 'Failed';
             } catch (e) {
-                updateItemStatus(item.id, 'error', '网络错误');
+                pill.className = 'status-pill error';
+                pill.innerText = 'Net Error';
             }
         }
 
         btn.disabled = false;
-        btn.innerText = '开始批量处理';
+        btn.innerText = '重新批量执行';
     };
 </script>
-
 </body>
 </html>
