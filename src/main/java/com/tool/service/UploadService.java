@@ -17,8 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.w3c.dom.Document;
 
 import javax.annotation.Resource;
+import javax.xml.parsers.DocumentBuilder;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -35,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.tool.util.DtxUtils.*;
+import static com.tool.util.MusicXmlUtil.*;
 
 @Service
 public class UploadService {
@@ -1455,6 +1458,138 @@ public class UploadService {
         } catch (Exception e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    //=================================== musicXml部分 =================================
+    public Boolean convertXml(MultipartFile file, String outPutPath) {
+        if (file == null || file.isEmpty()) {
+            System.err.println("上传的文件为空");
+            return false;
+        }
+        String originalName = file.getOriginalFilename();
+        String fileName = originalName.substring(0, originalName.lastIndexOf('.'));
+        try {
+            List<DrumInfo> drumInfoArrayList = parseMusicWithVariableTempo(file);
+            byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
+            int size = drumInfoArrayList.size();
+            int realSize = size * 6;
+            byte numHigh = (byte) ((realSize >> 8) & 0xFF);
+            byte numLow = (byte) (realSize & 0xFF);
+            bytes[0] = (byte) 0xAA;
+            bytes[1] = numHigh;
+            bytes[2] = numLow;
+            int index = 3;
+            for (DrumInfo info : drumInfoArrayList) {
+                BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal end = info.getEndTIme().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
+                int key = info.getKey();
+                int beginTimeValue = begin.intValue();
+                int endTimeValue = end.intValue();
+                byte beginHigh = (byte) ((beginTimeValue >> 8) & 0xFF);
+                byte beginLow = (byte) (beginTimeValue & 0xFF);
+                byte endHigh = (byte) ((endTimeValue >> 8) & 0xFF);
+                byte endLow = (byte) (endTimeValue & 0xFF);
+                byte keyHigh = (byte) ((key >> 8) & 0xFF);
+                byte keyLow = (byte) (key & 0xFF);
+                bytes[index++] = beginHigh;
+                bytes[index++] = beginLow;
+                bytes[index++] = endHigh;
+                bytes[index++] = endLow;
+                bytes[index++] = keyHigh;
+                bytes[index++] = keyLow;
+            }
+            byte check = 0;
+            for (int i = 0; i < bytes.length - 2; i++) {
+                check = (byte) (check ^ bytes[i]);
+            }
+            bytes[index++] = check;
+            bytes[index] = (byte) 0xEE;
+            DtxUtils.saveFile(outPutPath + "/" + fileName + "_level2.bin", bytes);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+
+    }
+
+
+    public Map<String, Object> fullProcessMusicXml(MultipartFile mp3File, MultipartFile xmlFile, MultipartFile mp3TempFile, MultipartFile xmlTempFile, String outputDir, Integer startSecond, Integer duration, Integer beginTime, Integer endTime) {
+        try {
+            Map<String, Object> resultMap = new HashMap<>();
+            resultMap.put("mp3Success", false);
+            resultMap.put("xmlSuccess", false);
+            resultMap.put("hammerResult", false);
+            resultMap.put("overallSuccess", false);
+            if (mp3File == null || mp3File.isEmpty()) {
+                resultMap.put("message", "MP3 文件为空");
+                return resultMap;
+            }
+            if (xmlFile == null || xmlFile.isEmpty()) {
+                resultMap.put("message", "musicXml文件为空");
+                return resultMap;
+            }
+            // 1. 获取基础文件名
+            String originalFilename = mp3File.getOriginalFilename();
+            if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".mp3")) {
+                resultMap.put("message", "MP3 文件格式不正确");
+                return resultMap;
+            }
+            String baseName = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
+            // 2. 在 outputDir 下创建文件名文件夹
+            File dir = new File(outputDir, baseName);
+            if (!dir.exists()) dir.mkdirs();
+            String finalOutputDir = dir.getAbsolutePath();
+            CompletableFuture<Boolean> mp3Future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return processMp3(mp3File, finalOutputDir, startSecond, duration);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            });
+
+            CompletableFuture<Boolean> xmlFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return convertXml(xmlFile, finalOutputDir);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            });
+            CompletableFuture<Boolean> hammerFuture = CompletableFuture.supplyAsync(() -> {
+                try {
+                    File tempFile = File.createTempFile("tempMp3", ".mp3");
+                    mp3TempFile.transferTo(tempFile);
+                    File tempFile2 = File.createTempFile("tempXml", ".xml");
+                    xmlTempFile.transferTo(tempFile2);
+                    int durationFromMp3 = getDurationFromMultipartFile(tempFile);
+                    int bpm = getFirstBpmFromXml(tempFile2);
+                    boolean b = genHammerModel(finalOutputDir, beginTime, endTime, durationFromMp3, bpm, baseName).getCode() == 200;
+                    tempFile.delete();
+                    tempFile2.delete();
+                    return b;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            });
+            // 等待所有任务完成
+            boolean mp3Result = mp3Future.join();
+            boolean xmlResult = xmlFuture.join();
+            boolean hammerResult = hammerFuture.join();
+            // 4. 最终整体成功条件：两个都成功
+            boolean overall = mp3Result && xmlResult && hammerResult;
+            resultMap.put("overallSuccess", overall);
+            resultMap.put("mp3Success", mp3Result);
+            resultMap.put("xmlSuccess", xmlResult);
+            resultMap.put("hammerResult", hammerResult);
+            resultMap.put("message", overall ? "全部处理成功" : "部分处理失败");
+            return resultMap;
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return null;
         }
     }
 

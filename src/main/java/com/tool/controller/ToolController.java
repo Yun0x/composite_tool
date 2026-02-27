@@ -294,6 +294,54 @@ public class ToolController {
         return (int) Math.round(totalSeconds);
     }
 
+    /**
+     * @Description：反编译Bin
+     * @author Lachesism
+     * @date 2025-12-30
+     */
+
+    @PostMapping("/convertXml")
+    public Result convertXml(@RequestParam("file") MultipartFile file, @RequestParam String outPutPath) {
+        if (file == null || file.isEmpty()) {
+            return Result.error("文件为空");
+        }
+        Boolean res = uploadService.convertXml(file, outPutPath);
+        if (Boolean.TRUE.equals(res)) {
+            return Result.success("生成成功");
+        } else {
+            return Result.error("上传失败");
+        }
+    }
+    /**
+     * @Description：musicXml全流程一键化处理
+     * @author Lachesism
+     * @date 2026-01-27
+     */
+    @PostMapping("/fullProcessMusicXml")
+    public Result<Map<String, Object>> fullProcessMusicXml(
+            @RequestParam("mp3") MultipartFile mp3File,
+            @RequestParam("mp3Temp") MultipartFile mp3TempFile,
+            @RequestParam(value = "xml") MultipartFile xmlFile,
+            @RequestParam(value = "xmlTmp") MultipartFile xmlTempFile,
+            @RequestParam("outputDir") String outputDir,
+            @RequestParam(value = "startSecond", required = false) Integer startSecond,
+            @RequestParam(value = "duration", required = false) Integer duration,
+            @RequestParam Integer beginTime,
+            @RequestParam Integer endTime)
+    {
+        if (mp3File == null || mp3File.isEmpty()) {
+            return Result.error("MP3 文件为空");
+        }
+        Map<String, Object> resultMap = uploadService.fullProcessMusicXml(mp3File, xmlFile,mp3TempFile,xmlTempFile, outputDir, startSecond, duration,beginTime,endTime);
+        boolean overallSuccess = (boolean) resultMap.getOrDefault("overallSuccess", false);
+        if (overallSuccess) {
+            return Result.success("处理成功", resultMap);
+        } else {
+            return Result.error(500, "处理失败", resultMap);
+        }
+    }
+
+
     public static void main(String[] args) {
         String a = "02020202020202023202020202020202";
         String b = "020202340202020202020202020202020202";

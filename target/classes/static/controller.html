@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>终端控制台 - Pro Max Ultra</title>
+    <title>架子鼓终端</title>
     <style>
         :root {
             --primary-blue: #3b82f6;
@@ -13,8 +13,6 @@
             --glass-bg: rgba(255, 255, 255, 0.7);
             --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-
-        /* 极致背景：动画渐变网格 */
         body {
             margin: 0;
             padding: 20px;
@@ -39,8 +37,6 @@
                     radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0, transparent 50%);
             z-index: -1;
         }
-
-        /* 环境切换器 */
         .env-header {
             width: 100%;
             max-width: 1200px;
@@ -97,8 +93,6 @@
             border-radius: 20px;
             color: #475569;
         }
-
-        /* 主容器布局 */
         .main-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -124,8 +118,6 @@
             transform: translateY(-10px) scale(1.02);
             box-shadow: 0 30px 60px -12px rgba(0,0,0,0.15);
         }
-
-        /* 悬浮时的流光边框效果 */
         .card::after {
             content: "";
             position: absolute;
@@ -149,7 +141,6 @@
             gap: 10px;
         }
 
-        /* 表单控件美化 */
         .form-group { margin-bottom: 20px; }
         .form-group label {
             display: block;
@@ -181,7 +172,6 @@
             transform: scale(1.01);
         }
 
-        /* 滑动选择器美化 */
         .pill-switcher {
             display: flex;
             background: rgba(0,0,0,0.05);
@@ -212,18 +202,15 @@
             z-index: 1;
         }
 
-        /* 远程启动特定两档逻辑 */
         #rb_lvl1:checked ~ .pill-bar { transform: translateX(0); background: var(--primary-blue); }
         #rb_lvl2:checked ~ .pill-bar { transform: translateX(100%); background: var(--primary-blue); }
         .pill-switcher input:checked + label { color: white; }
 
-        /* 自动运行三档逻辑 */
         .tri-bar { width: calc(33.33% - 4px) !important; }
         #mode_traffic:checked ~ .tri-bar { transform: translateX(0); background: var(--primary-purple); }
         #mode_off:checked ~ .tri-bar { transform: translateX(100%); background: var(--primary-red); }
         #mode_always:checked ~ .tri-bar { transform: translateX(200%); background: var(--primary-purple); }
 
-        /* 动作按钮 */
         .btn {
             width: 100%;
             padding: 14px;
@@ -248,7 +235,6 @@
 
         .btn:active { transform: translateY(1px) scale(0.98); }
 
-        /* 阶段行 */
         .stage-box {
             background: rgba(255,255,255,0.4);
             border-radius: 16px;
@@ -259,7 +245,6 @@
         .stage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .stage-title { font-size: 14px; font-weight: 700; color: #1e293b; }
 
-        /* 开关美化 */
         .ios-switch {
             width: 40px; height: 22px;
             background: #cbd5e1;
@@ -288,7 +273,6 @@
         }
         .inputs-grid.collapsed { max-height: 0; opacity: 0; overflow: hidden; }
 
-        /* 通知样式 */
         #notify-box {
             position: fixed;
             top: 30px; right: 30px;
@@ -316,7 +300,6 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        /* 响应式调整 */
         @media (max-width: 600px) {
             .main-container { grid-template-columns: 1fr; }
             body { padding: 10px; }
