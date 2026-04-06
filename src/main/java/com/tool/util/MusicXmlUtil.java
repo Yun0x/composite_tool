@@ -8,6 +8,7 @@ import org.xml.sax.InputSource;
 import javax.xml.parsers.*;
 import java.io.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -23,19 +24,38 @@ public class MusicXmlUtil {
 
     static {
         DRUM_MAPPING.put("G5-normal", 1);   // HH(开镲)
-        DRUM_MAPPING.put("A5-x", 2);        // CY(Crash Cymabl)
+        DRUM_MAPPING.put("A5-x", 1);        // CY(Crash Cymabl)
         DRUM_MAPPING.put("C5-normal", 4);   // SD(Snare Drum)
+        DRUM_MAPPING.put("C5-x", 4);        // SD(Snare Drum)
+        DRUM_MAPPING.put("B4-normal", 4);   // SD(Snare Drum)
         DRUM_MAPPING.put("E5-normal", 8);   // HT(High Tom/Tom1)
-        DRUM_MAPPING.put("F5-x", 16);       // LC(Ride Cymbal)
-        DRUM_MAPPING.put("B5-x", 32);       // LP(Crash1)
+        DRUM_MAPPING.put("F5-x", 2);       // LC(Ride Cymbal)
+        DRUM_MAPPING.put("B5-x", 16);       // LP(Crash1)
         DRUM_MAPPING.put("D5-normal", 64);  // LT(Low Tom/Tom2)
         DRUM_MAPPING.put("A4-normal", 128); // FT(Floor Tom/Tom3)
-        DRUM_MAPPING.put("G5-x", 256);      // FI(Closed Hi-Hat)
-        DRUM_MAPPING.put("D4-x", 512);      // ED(Bass Drum)
+        DRUM_MAPPING.put("D4-x", 256);      // ED(Bass Drum)
         DRUM_MAPPING.put("F4-normal", 512); // ED2(Bass Drum)
-        DRUM_MAPPING.put("E4-normal", 257); // 闭镲（HH+FI)
+        DRUM_MAPPING.put("G5-x", 257);         //闭镲（HH+FI)
+        DRUM_MAPPING.put("E4-normal", 512); // 闭镲（HH+FI)
         DRUM_MAPPING.put("C6-x", 16);       // 水镲，但是算做LC
         DRUM_MAPPING.put("B5-normal", 32);  // China Cymbal 算作LP
+//        DRUM_MAPPING.put("A5-x", 1);  // HH(开镲)
+
+
+//        DRUM_MAPPING.put("G5-normal", 1);   // HH(开镲)
+//        DRUM_MAPPING.put("A5-x", 2);        // CY(Crash Cymabl)
+//        DRUM_MAPPING.put("C5-normal", 4);   // SD(Snare Drum)
+//        DRUM_MAPPING.put("E5-normal", 8);   // HT(High Tom/Tom1)
+//        DRUM_MAPPING.put("F5-x", 16);       // LC(Ride Cymbal)
+//        DRUM_MAPPING.put("B5-x", 32);       // LP(Crash1)
+//        DRUM_MAPPING.put("D5-normal", 64);  // LT(Low Tom/Tom2)
+//        DRUM_MAPPING.put("A4-normal", 128); // FT(Floor Tom/Tom3)
+//        DRUM_MAPPING.put("G5-x", 256);      // FI(Closed Hi-Hat)
+//        DRUM_MAPPING.put("D4-x", 512);      // ED(Bass Drum)
+//        DRUM_MAPPING.put("F4-normal", 512); // ED2(Bass Drum)
+//        DRUM_MAPPING.put("E4-normal", 257); // 闭镲（HH+FI)
+//        DRUM_MAPPING.put("C6-x", 16);       // 水镲，但是算做LC
+//        DRUM_MAPPING.put("B5-normal", 32);  // China Cymbal 算作LP
     }
 
     // 内部类：记录变速点
@@ -161,11 +181,9 @@ public class MusicXmlUtil {
 
                                 String mapKey = pos + "-" + head;
                                 Integer midiVal = DRUM_MAPPING.get(mapKey);
-                                if (midiVal == null) {
-                                    midiVal = calculateMidi(step, octave, alter);
+                                if (midiVal != null) {
+                                    noteEvents.add(new NoteEvent(noteStartOffset, midiVal));
                                 }
-                                // 将有效音符加入预处理列表（此时不转毫秒）
-                                noteEvents.add(new NoteEvent(noteStartOffset, midiVal));
                             }
                         }
                     }
@@ -223,26 +241,28 @@ public class MusicXmlUtil {
     }
 
     public static List<DrumInfo> parseMusicWithVariableTempo(MultipartFile file) throws Exception {
-        // 1. 初始化解析器并防止加载外部 DTD
+        // 1. 初始化解析器并防止加载外部 DTD (安全配置)
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setValidating(false);
         factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         factory.setFeature("http://xml.org/sax/features/validation", false);
         DocumentBuilder builder = factory.newDocumentBuilder();
         builder.setEntityResolver((publicId, systemId) -> new InputSource(new StringReader("")));
+
         Document doc;
         try (InputStream is = file.getInputStream()) {
             doc = builder.parse(is);
         }
+
         List<TempoChange> tempoChanges = new ArrayList<>();
         List<NoteEvent> noteEvents = new ArrayList<>();
 
         NodeList parts = doc.getElementsByTagName("part");
-        // 解析拍数偏移Offset
+
         for (int p = 0; p < parts.getLength(); p++) {
             Element part = (Element) parts.item(p);
-            double globalOffset = 0.0;
-            int divisions = 1;
+            double globalOffset = 0.0; // 拍数偏移
+            int divisions = 1;        // 每四分音符包含的单位数
 
             NodeList measures = part.getElementsByTagName("measure");
             for (int m = 0; m < measures.getLength(); m++) {
@@ -254,10 +274,11 @@ public class MusicXmlUtil {
                 for (int i = 0; i < children.getLength(); i++) {
                     Node node = children.item(i);
                     if (node.getNodeType() != Node.ELEMENT_NODE) continue;
+
                     Element el = (Element) node;
                     String tagName = el.getTagName();
 
-                    // 处理 divisions
+                    // 处理 divisions (解析精度)
                     if ("attributes".equals(tagName)) {
                         NodeList divNodes = el.getElementsByTagName("divisions");
                         if (divNodes.getLength() > 0) {
@@ -286,12 +307,14 @@ public class MusicXmlUtil {
                         boolean isChord = el.getElementsByTagName("chord").getLength() > 0;
                         boolean isRest = el.getElementsByTagName("rest").getLength() > 0;
 
+                        // 计算当前音符占据的拍数
                         double durationBeats = 0;
                         NodeList durNodes = el.getElementsByTagName("duration");
                         if (durNodes.getLength() > 0) {
                             durationBeats = Double.parseDouble(durNodes.item(0).getTextContent()) / divisions;
                         }
 
+                        // 如果是和音，回退到当前组的起始位置
                         if (isChord) {
                             globalOffset -= lastNoteDuration;
                         }
@@ -301,18 +324,15 @@ public class MusicXmlUtil {
                         lastNoteDuration = durationBeats;
                         maxMeasureOffset = Math.max(maxMeasureOffset, globalOffset);
 
+                        // 如果不是休止符，则解析打击乐映射
                         if (!isRest) {
                             NodeList pitchNodes = el.getElementsByTagName("pitch");
                             if (pitchNodes.getLength() > 0) {
                                 Element pitchEl = (Element) pitchNodes.item(0);
                                 String step = pitchEl.getElementsByTagName("step").item(0).getTextContent();
                                 int octave = Integer.parseInt(pitchEl.getElementsByTagName("octave").item(0).getTextContent());
-                                int alter = 0;
-                                NodeList alterNodes = pitchEl.getElementsByTagName("alter");
-                                if (alterNodes.getLength() > 0) {
-                                    alter = (int) Double.parseDouble(alterNodes.item(0).getTextContent());
-                                }
 
+                                // 获取音符头类型 (用于区分打击乐器，如 normal, x, cross)
                                 String head = "normal";
                                 NodeList headNodes = el.getElementsByTagName("notehead");
                                 if (headNodes.getLength() > 0) {
@@ -321,20 +341,23 @@ public class MusicXmlUtil {
 
                                 String mapKey = step + octave + "-" + head;
                                 Integer midiVal = DRUM_MAPPING.get(mapKey);
-                                if (midiVal == null) {
-                                    midiVal = calculateMidi(step, octave, alter);
+
+                                // --- 核心修改：如果映射表里没有，直接忽略该音符 ---
+                                if (midiVal != null) {
+                                    noteEvents.add(new NoteEvent(noteStartOffset, midiVal));
                                 }
-                                noteEvents.add(new NoteEvent(noteStartOffset, midiVal));
                             }
                         }
                     }
-                    // 处理回退和前进
+                    // 处理回退 (多声部处理)
                     else if ("backup".equals(tagName)) {
                         NodeList durNodes = el.getElementsByTagName("duration");
                         if (durNodes.getLength() > 0) {
                             globalOffset -= Double.parseDouble(durNodes.item(0).getTextContent()) / divisions;
                         }
-                    } else if ("forward".equals(tagName)) {
+                    }
+                    // 处理前进
+                    else if ("forward".equals(tagName)) {
                         NodeList durNodes = el.getElementsByTagName("duration");
                         if (durNodes.getLength() > 0) {
                             globalOffset += Double.parseDouble(durNodes.item(0).getTextContent()) / divisions;
@@ -342,28 +365,37 @@ public class MusicXmlUtil {
                         }
                     }
                 }
+                // 确保小节结束时位移同步
                 globalOffset = maxMeasureOffset;
             }
         }
-        // 转换毫秒
+
+        // 3. 转换时间为毫秒
         if (tempoChanges.isEmpty()) {
             tempoChanges.add(new TempoChange(0.0, 120.0));
         }
         tempoChanges.sort(Comparator.comparingDouble(t -> t.offset));
+
+        // 按毫秒时间戳分组音符（合并同一时间点的多个击打）
         TreeMap<Integer, Set<Integer>> timeGroups = new TreeMap<>();
         for (NoteEvent event : noteEvents) {
             int msTime = getMsAtOffset(event.offset, tempoChanges);
             timeGroups.computeIfAbsent(msTime, k -> new HashSet<>()).add(event.midiVal);
         }
+
+        // 4. 生成结果列表
         List<DrumInfo> drumInfoArrayList = new ArrayList<>();
         for (Map.Entry<Integer, Set<Integer>> entry : timeGroups.entrySet()) {
             DrumInfo drum = new DrumInfo();
+            // 计算同一时间点所有音符的 Key 总和（或根据业务逻辑修改）
             int keySum = entry.getValue().stream().mapToInt(Integer::intValue).sum();
-            drum.setBeginTIme(BigDecimal.valueOf(entry.getKey()));
+
+            drum.setBeginTime(BigDecimal.valueOf(entry.getKey()));
             drum.setKey(keySum);
-            drum.setEndTIme(BigDecimal.valueOf(entry.getKey() + 100));
+            drum.setEndTime(BigDecimal.valueOf(entry.getKey() + 100)); // 默认持续 100ms
             drumInfoArrayList.add(drum);
         }
+
         return drumInfoArrayList;
     }
 
@@ -465,18 +497,55 @@ public class MusicXmlUtil {
     }
 
     public static void main(String[] args) {
-        try {
-            String filePath = "D:\\Downloads\\离开地球表面.musicxml";
-            String jsonOutput = filePath.substring(0, filePath.lastIndexOf('.')) + ".json";
-
-            List<Map<String, Object>> data = parseMusicWithVariableTempo(filePath, jsonOutput);
-            // 打印前几个结果对比
-            for (int i = 0; i < Math.min(20, data.size()); i++) {
-                System.out.println(data.get(i));
+        List<DrumInfo> drumInfoArrayList = new ArrayList<>();
+        BigDecimal beginTime = new BigDecimal(62.2);
+        BigDecimal IntervalTime = new BigDecimal(0.5);
+        BigDecimal stepTime = new BigDecimal(1.4);
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 4; j++) {
+                DrumInfo drumInfo = new DrumInfo();
+                drumInfo.setBeginTime(beginTime);
+                drumInfo.setEndTime(beginTime.add(IntervalTime));
+                drumInfo.setKey(1 << i);
+                drumInfoArrayList.add(drumInfo);
+                beginTime = beginTime.add(new BigDecimal(1));
             }
-            System.out.println("成功导出至：" + jsonOutput);
-        } catch (Exception e) {
-            e.printStackTrace();
+            beginTime = beginTime.add(stepTime);
         }
+        byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
+        int size = drumInfoArrayList.size();
+        int realSize = size * 6;
+        byte numHigh = (byte) ((realSize >> 8) & 0xFF);
+        byte numLow = (byte) (realSize & 0xFF);
+        bytes[0] = (byte) 0xAA;
+        bytes[1] = numHigh;
+        bytes[2] = numLow;
+        int index = 3;
+        for (DrumInfo info : drumInfoArrayList) {
+            BigDecimal begin = info.getBeginTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+            BigDecimal end = info.getEndTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+            int key = info.getKey();
+            int beginTimeValue = begin.intValue();
+            int endTimeValue = end.intValue();
+            byte beginHigh = (byte) ((beginTimeValue >> 8) & 0xFF);
+            byte beginLow = (byte) (beginTimeValue & 0xFF);
+            byte endHigh = (byte) ((endTimeValue >> 8) & 0xFF);
+            byte endLow = (byte) (endTimeValue & 0xFF);
+            byte keyHigh = (byte) ((key >> 8) & 0xFF);
+            byte keyLow = (byte) (key & 0xFF);
+            bytes[index++] = beginHigh;
+            bytes[index++] = beginLow;
+            bytes[index++] = endHigh;
+            bytes[index++] = endLow;
+            bytes[index++] = keyHigh;
+            bytes[index++] = keyLow;
+        }
+        byte check = 0;
+        for (int i = 0; i < bytes.length - 2; i++) {
+            check = (byte) (check ^ bytes[i]);
+        }
+        bytes[index++] = check;
+        bytes[index] = (byte) 0xEE;
+        DtxUtils.saveFile("D:\\Downloads\\S20002_测试\\level1.bin", bytes);
     }
 }

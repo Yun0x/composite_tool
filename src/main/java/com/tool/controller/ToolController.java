@@ -4,18 +4,27 @@ import com.tool.service.TestService;
 import com.tool.service.UploadService;
 import com.tool.util.DtxUtils;
 import com.tool.util.Result;
+import com.tool.vo.DrumInfo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.tool.util.MusicXmlConverter.*;
 
 @RestController
 @RequestMapping("/tool")
@@ -295,23 +304,21 @@ public class ToolController {
     }
 
     /**
-     * @Description：反编译Bin
+     * @Description：转换xml
      * @author Lachesism
      * @date 2025-12-30
      */
 
     @PostMapping("/convertXml")
-    public Result convertXml(@RequestParam("file") MultipartFile file, @RequestParam String outPutPath) {
-        if (file == null || file.isEmpty()) {
-            return Result.error("文件为空");
-        }
-        Boolean res = uploadService.convertXml(file, outPutPath);
+    public Result convertXml(@RequestParam String outPutPath, @RequestParam(value = "delayTime", defaultValue = "0") Integer delayTime) {
+        Boolean res = uploadService.convertXml(outPutPath, delayTime);
         if (Boolean.TRUE.equals(res)) {
             return Result.success("生成成功");
         } else {
             return Result.error("上传失败");
         }
     }
+
     /**
      * @Description：musicXml全流程一键化处理
      * @author Lachesism
@@ -322,17 +329,16 @@ public class ToolController {
             @RequestParam("mp3") MultipartFile mp3File,
             @RequestParam("mp3Temp") MultipartFile mp3TempFile,
             @RequestParam(value = "xml") MultipartFile xmlFile,
-            @RequestParam(value = "xmlTmp") MultipartFile xmlTempFile,
             @RequestParam("outputDir") String outputDir,
             @RequestParam(value = "startSecond", required = false) Integer startSecond,
             @RequestParam(value = "duration", required = false) Integer duration,
+            @RequestParam(value = "delayTime", defaultValue = "0") Integer delayTime,
             @RequestParam Integer beginTime,
-            @RequestParam Integer endTime)
-    {
+            @RequestParam Integer endTime) {
         if (mp3File == null || mp3File.isEmpty()) {
             return Result.error("MP3 文件为空");
         }
-        Map<String, Object> resultMap = uploadService.fullProcessMusicXml(mp3File, xmlFile,mp3TempFile,xmlTempFile, outputDir, startSecond, duration,beginTime,endTime);
+        Map<String, Object> resultMap = uploadService.fullProcessMusicXml(mp3File, xmlFile, mp3TempFile, outputDir, startSecond, duration, delayTime, beginTime, endTime);
         boolean overallSuccess = (boolean) resultMap.getOrDefault("overallSuccess", false);
         if (overallSuccess) {
             return Result.success("处理成功", resultMap);
@@ -343,27 +349,74 @@ public class ToolController {
 
 
     public static void main(String[] args) {
-        String a = "02020202020202023202020202020202";
-        String b = "020202340202020202020202020202020202";
-        String f = "0002020202020202020202";
-        String c = "02020202020202022A020202020202020202022A2A2A2A022A02020202020202";
-        String e = "2C020202020202022C020202020202022C020202020202022C020202020202022C020202020202022C020202020202022C02020202020202022C02020202022C02020202020202022C02020202020202022C02022C02022C02022C0202020202";
-        String d = "260202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020226020202020202020202020202020202260202020202020202020202020202020202020202020202020202020202020202260202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202";
-        System.out.println(DtxUtils.transferMachine("#09022: 02020202020202022A020202020202020202022A2A2A2A022A02020202020202"));
-        // 每 8 个字符为一组
-        List<String> groups = new ArrayList<>();
-
-        for (int i = 0; i < a.length(); i += 4) {
-            if (i + 4 <= a.length()) {
-                groups.add(a.substring(i, i + 4));
-            } else {
-                // 末尾不满 8 个字符的情况
-                groups.add(a.substring(i));
-            }
-        }
-
-//        System.out.println(groups);
+        String outputDir = "D:\\Downloads\\S00028_小毛驴";
+//        System.out.println(runPythonParse(outputDir));
     }
 
+    /**
+     * @Description：musicXml全流程一键化处理
+     * @author Lachesism
+     * @date 2026-01-27
+     */
+    @PostMapping("/testXml")
+    public void testXml(@RequestParam(value = "xml") MultipartFile xmlFile) {
+        List<DrumInfo> drumInfoArrayList = parseMusicXmlToInitList(xmlFile);
+        List<DrumInfo> resultList = drumInfoArrayList.stream()
+                .collect(Collectors.toMap(
+                        DrumInfo::getBeginTime,    // 以 BigDecimal 类型的 beginTime 作为 Key
+                        info -> info,               // Value 是对象本身
+                        (existing, replacement) -> {
+                            // 当 beginTime 一样时进入此合并逻辑
+
+                            Integer k1 = existing.getKey();
+                            Integer k2 = replacement.getKey();
+
+                            // 如果 key 不一样，则将数值相加，并替换第一个元素的 key
+                            if (k1 != null && k2 != null && !k1.equals(k2)) {
+                                existing.setKey(k1 + k2);
+                            }
+                            // 如果 key 一样，这里什么都不用做，直接返回 existing
+                            // 实际上就满足了“移除相同元素”的要求
+
+                            return existing;
+                        },
+                        LinkedHashMap::new // 保持原始处理顺序
+                ))
+                .values()
+                .stream()
+                .sorted(Comparator.comparing(DrumInfo::getBeginTime)) // 最终按时间轴正序排列
+                .collect(Collectors.toList());
+        drumInfoArrayList = resultList;
+        for (DrumInfo drumInfo : drumInfoArrayList) {
+            System.out.println(drumInfo);
+        }
+    }
+
+
+    /**
+     * @Description：反编译Bin
+     * @author Lachesism
+     * @date 2025-12-30
+     */
+    @PostMapping("/analyzeDrumInfo")
+    public Result analyzeDrumInfo(@RequestParam("file") MultipartFile file) {
+        List<DrumInfo> drumInfo = uploadService.analyzeDrumInfo(file);
+        return Result.success(drumInfo);
+    }
+
+
+    /**
+     * @Description：生成合同
+     * @author Lachesism
+     * @date 2026-03-19
+     */
+    @GetMapping("generateContract")
+    public Result generateContractsTemp(@RequestParam(required = false) String userName,
+                                        @RequestParam String personName,
+                                        @RequestParam Integer type,
+                                        @RequestParam String receiverNo) {
+        uploadService.generateContractsTemp(userName, personName, type, receiverNo);
+        return Result.success();
+    }
 
 }

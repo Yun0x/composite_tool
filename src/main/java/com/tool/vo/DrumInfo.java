@@ -7,11 +7,11 @@ import java.math.BigDecimal;
 @Data
 public class DrumInfo {
 
-    private BigDecimal beginTIme;
+    private BigDecimal beginTime;
 
     private BigDecimal intervalTime;
 
     private Integer key;
 
-    private BigDecimal endTIme;
+    private BigDecimal endTime;
 }

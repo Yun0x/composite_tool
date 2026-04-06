@@ -1,5 +1,6 @@
 package com.tool.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tool.mapper.UploadMapper;
 import com.tool.util.AsyncUtil;
@@ -35,9 +36,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
+import static com.tool.util.DrumUtil.*;
 import static com.tool.util.DtxUtils.*;
+import static com.tool.util.MusicXmlConverter.parseMusicXmlToInitList;
+import static com.tool.util.MusicXmlConverter.runPythonParse;
 import static com.tool.util.MusicXmlUtil.*;
+import static com.tool.util.generateContractUtil.generateContract;
 
 @Service
 public class UploadService {
@@ -396,7 +402,7 @@ public class UploadService {
                 RawDrumEvent currentEvent = rawDrumEventList.get(i);
                 DrumInfo drum = new DrumInfo();
                 drum.setKey(currentEvent.key);
-                drum.setBeginTIme(currentEvent.beginTime);
+                drum.setBeginTime(currentEvent.beginTime);
                 BigDecimal nextBeginTime = null;
                 // 查找下一个同键事件
                 for (int j = i + 1; j < rawDrumEventList.size(); j++) {
@@ -421,9 +427,9 @@ public class UploadService {
                     // 当前是该键的最后一个事件，默认 endTime = beginTime + 1.0s
                     endTime = currentEvent.beginTime.add(oneSecond);
                 }
-                drum.setEndTIme(endTime);
+                drum.setEndTime(endTime);
                 // 重新计算 intervalTime
-                drum.setIntervalTime(drum.getEndTIme().subtract(drum.getBeginTIme()));
+                drum.setIntervalTime(drum.getEndTime().subtract(drum.getBeginTime()));
                 drumInfoArrayList.add(drum);
             }
             byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
@@ -436,8 +442,8 @@ public class UploadService {
             bytes[2] = numLow;
             int index = 3;
             for (DrumInfo info : drumInfoArrayList) {
-                BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
-                BigDecimal end = info.getEndTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal begin = info.getBeginTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal end = info.getEndTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
                 int key = info.getKey();
                 int beginTimeValue = begin.intValue();
                 int endTimeValue = end.intValue();
@@ -708,6 +714,10 @@ public class UploadService {
         return Result.success(result);
     }
 
+    public void generateContractsTemp(String userName, String personName, Integer type, String receiverNo) {
+        generateContract(type == 1 ? "57" : "58", userName, personName, receiverNo);
+    }
+
 
     private static class RawDrumEvent {
         Integer key;
@@ -823,13 +833,13 @@ public class UploadService {
  * * 63 = "0203030303030303030303"
  * *
  * 不考虑bgm，不考虑bg图，不考虑音源，只处理鼓点数据
- * 0 = {DrumInfo@8126} "DrumInfo(beginTIme=0.0000, intervalTime=0.125000, key=1023, endTIme=0.125000)"
- * 1 = {DrumInfo@8042} "DrumInfo(beginTIme=0.500000, intervalTime=0.125000, key=31, endTIme=0.625000)"
- * 2 = {DrumInfo@8093} "DrumInfo(beginTIme=0.625000, intervalTime=0.125000, key=31, endTIme=0.750000)"
- * 3 = {DrumInfo@8127} "DrumInfo(beginTIme=2.000000, intervalTime=0.125000, key=1023, endTIme=2.125000)"
- * 4 = {DrumInfo@8128} "DrumInfo(beginTIme=4.000000, intervalTime=0.125000, key=1023, endTIme=4.125000)"
- * 5 = {DrumInfo@8129} "DrumInfo(beginTIme=6.000000, intervalTime=0.125000, key=1023, endTIme=6.125000)"
- * 6 = {DrumInfo@8130} "DrumInfo(beginTIme=8.000000, intervalTime=0.125000, key=1023, endTIme=8.125000)"
+ * 0 = {DrumInfo@8126} "DrumInfo(beginTime=0.0000, intervalTime=0.125000, key=1023, endTime=0.125000)"
+ * 1 = {DrumInfo@8042} "DrumInfo(beginTime=0.500000, intervalTime=0.125000, key=31, endTime=0.625000)"
+ * 2 = {DrumInfo@8093} "DrumInfo(beginTime=0.625000, intervalTime=0.125000, key=31, endTime=0.750000)"
+ * 3 = {DrumInfo@8127} "DrumInfo(beginTime=2.000000, intervalTime=0.125000, key=1023, endTime=2.125000)"
+ * 4 = {DrumInfo@8128} "DrumInfo(beginTime=4.000000, intervalTime=0.125000, key=1023, endTime=4.125000)"
+ * 5 = {DrumInfo@8129} "DrumInfo(beginTime=6.000000, intervalTime=0.125000, key=1023, endTime=6.125000)"
+ * 6 = {DrumInfo@8130} "DrumInfo(beginTime=8.000000, intervalTime=0.125000, key=1023, endTime=8.125000)"
  */
 
     /**
@@ -1035,7 +1045,7 @@ public class UploadService {
                     RawDrumEvent currentEvent = rawDrumEventList.get(i);
                     DrumInfo drum = new DrumInfo();
                     drum.setKey(currentEvent.key);
-                    drum.setBeginTIme(currentEvent.beginTime);
+                    drum.setBeginTime(currentEvent.beginTime);
                     BigDecimal nextBeginTime = null;
                     // 查找下一个同键事件
                     for (int j = i + 1; j < rawDrumEventList.size(); j++) {
@@ -1060,9 +1070,9 @@ public class UploadService {
                         // 当前是该键的最后一个事件，默认 endTime = beginTime + 1.0s
                         endTime = currentEvent.beginTime.add(oneSecond);
                     }
-                    drum.setEndTIme(endTime);
+                    drum.setEndTime(endTime);
                     // 重新计算 intervalTime
-                    drum.setIntervalTime(drum.getEndTIme().subtract(drum.getBeginTIme()));
+                    drum.setIntervalTime(drum.getEndTime().subtract(drum.getBeginTime()));
                     drumInfoArrayList.add(drum);
                 }
                 byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
@@ -1075,8 +1085,8 @@ public class UploadService {
                 bytes[2] = numLow;
                 int index = 3;
                 for (DrumInfo info : drumInfoArrayList) {
-                    BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
-                    BigDecimal end = info.getEndTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                    BigDecimal begin = info.getBeginTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                    BigDecimal end = info.getEndTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
                     int key = info.getKey();
                     int beginTimeValue = begin.intValue();
                     int endTimeValue = end.intValue();
@@ -1389,7 +1399,7 @@ public class UploadService {
                 RawDrumEvent currentEvent = rawDrumEventList.get(i);
                 DrumInfo drum = new DrumInfo();
                 drum.setKey(currentEvent.key);
-                drum.setBeginTIme(currentEvent.beginTime);
+                drum.setBeginTime(currentEvent.beginTime);
                 BigDecimal nextBeginTime = null;
                 // 查找下一个同键事件
                 for (int j = i + 1; j < rawDrumEventList.size(); j++) {
@@ -1414,9 +1424,9 @@ public class UploadService {
                     // 当前是该键的最后一个事件，默认 endTime = beginTime + 1.0s
                     endTime = currentEvent.beginTime.add(oneSecond);
                 }
-                drum.setEndTIme(endTime);
+                drum.setEndTime(endTime);
                 // 重新计算 intervalTime
-                drum.setIntervalTime(drum.getEndTIme().subtract(drum.getBeginTIme()));
+                drum.setIntervalTime(drum.getEndTime().subtract(drum.getBeginTime()));
                 drumInfoArrayList.add(drum);
             }
             byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
@@ -1429,8 +1439,8 @@ public class UploadService {
             bytes[2] = numLow;
             int index = 3;
             for (DrumInfo info : drumInfoArrayList) {
-                BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
-                BigDecimal end = info.getEndTIme().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal begin = info.getBeginTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal end = info.getEndTime().multiply(new BigDecimal(100)).setScale(0, RoundingMode.HALF_UP);
                 int key = info.getKey();
                 int beginTimeValue = begin.intValue();
                 int endTimeValue = end.intValue();
@@ -1462,15 +1472,17 @@ public class UploadService {
     }
 
     //=================================== musicXml部分 =================================
-    public Boolean convertXml(MultipartFile file, String outPutPath) {
-        if (file == null || file.isEmpty()) {
-            System.err.println("上传的文件为空");
-            return false;
-        }
-        String originalName = file.getOriginalFilename();
-        String fileName = originalName.substring(0, originalName.lastIndexOf('.'));
+    public Boolean convertXml(String outPutPath, Integer delayTime) {
         try {
-            List<DrumInfo> drumInfoArrayList = parseMusicWithVariableTempo(file);
+            String jsonPath = runPythonParse(outPutPath, delayTime);
+            File file = new File(jsonPath);
+            String fileName = file.getName().substring(0, file.getName().lastIndexOf('.'));
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<DrumInfo> drumInfoArrayList = objectMapper.readValue(
+                    new File(jsonPath),
+                    new TypeReference<List<DrumInfo>>() {
+                    }
+            );
             byte[] bytes = new byte[drumInfoArrayList.size() * 6 + 5];
             int size = drumInfoArrayList.size();
             int realSize = size * 6;
@@ -1480,12 +1492,13 @@ public class UploadService {
             bytes[1] = numHigh;
             bytes[2] = numLow;
             int index = 3;
+            Integer batchDelayTime = new Integer(20);
             for (DrumInfo info : drumInfoArrayList) {
-                BigDecimal begin = info.getBeginTIme().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
-                BigDecimal end = info.getEndTIme().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal begin = info.getBeginTime().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
+                BigDecimal end = info.getEndTime().multiply(new BigDecimal(0.1)).setScale(0, RoundingMode.HALF_UP);
                 int key = info.getKey();
-                int beginTimeValue = begin.intValue();
-                int endTimeValue = end.intValue();
+                int beginTimeValue = begin.intValue() + batchDelayTime;
+                int endTimeValue = end.intValue() + batchDelayTime;
                 byte beginHigh = (byte) ((beginTimeValue >> 8) & 0xFF);
                 byte beginLow = (byte) (beginTimeValue & 0xFF);
                 byte endHigh = (byte) ((endTimeValue >> 8) & 0xFF);
@@ -1505,7 +1518,8 @@ public class UploadService {
             }
             bytes[index++] = check;
             bytes[index] = (byte) 0xEE;
-            DtxUtils.saveFile(outPutPath + "/" + fileName + "_level2.bin", bytes);
+            String bin2Path = outPutPath + "\\" + fileName + "\\" + fileName + "_level2.bin";
+            DtxUtils.saveFile(bin2Path, bytes);
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -1515,7 +1529,7 @@ public class UploadService {
     }
 
 
-    public Map<String, Object> fullProcessMusicXml(MultipartFile mp3File, MultipartFile xmlFile, MultipartFile mp3TempFile, MultipartFile xmlTempFile, String outputDir, Integer startSecond, Integer duration, Integer beginTime, Integer endTime) {
+    public Map<String, Object> fullProcessMusicXml(MultipartFile mp3File, MultipartFile xmlFile, MultipartFile mp3TempFile, String outputDir, Integer startSecond, Integer duration, Integer delayTime, Integer beginTime, Integer endTime) {
         try {
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put("mp3Success", false);
@@ -1552,7 +1566,11 @@ public class UploadService {
 
             CompletableFuture<Boolean> xmlFuture = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return convertXml(xmlFile, finalOutputDir);
+                    Boolean b = convertXml(outputDir, delayTime);
+                    if (b) {
+                        decompileXmlBin(finalOutputDir + "/" + baseName + "_level2.bin", finalOutputDir);
+                    }
+                    return b;
                 } catch (Exception e) {
                     e.printStackTrace();
                     return false;
@@ -1563,7 +1581,7 @@ public class UploadService {
                     File tempFile = File.createTempFile("tempMp3", ".mp3");
                     mp3TempFile.transferTo(tempFile);
                     File tempFile2 = File.createTempFile("tempXml", ".xml");
-                    xmlTempFile.transferTo(tempFile2);
+                    xmlFile.transferTo(tempFile2);
                     int durationFromMp3 = getDurationFromMultipartFile(tempFile);
                     int bpm = getFirstBpmFromXml(tempFile2);
                     boolean b = genHammerModel(finalOutputDir, beginTime, endTime, durationFromMp3, bpm, baseName).getCode() == 200;
@@ -1592,5 +1610,129 @@ public class UploadService {
             return null;
         }
     }
+
+    public Boolean decompileXmlBin(String filePath, String outputDir) {
+        try {
+            File file = new File(filePath);
+            String fileName = file.getName(); // S00037_level2.bin
+
+            int dotIndex = fileName.lastIndexOf(".");
+            if (dotIndex > 0) {
+                fileName = fileName.substring(0, dotIndex);
+            }
+            // 1. 定义输出路径
+            String txtOutputFile = outputDir + File.separator + fileName + "反编译.txt";
+            String excelOutputFile = outputDir + File.separator + fileName + "反编译.xlsx";
+            String jsonOutputFile = outputDir + File.separator + fileName + "反编译.json"; // 新增 JSON 路径
+
+            byte[] bytes = Files.readAllBytes(file.toPath());
+            if (bytes.length < 5 || bytes[0] != (byte) 0xAA || bytes[bytes.length - 1] != (byte) 0xEE) {
+                System.out.println("文件格式不正确");
+                return false;
+            }
+            int lengthHigh = bytes[1] & 0xFF;
+            int lengthLow = bytes[2] & 0xFF;
+            int dataLength = (lengthHigh << 8) | lengthLow;
+            int expectedLength = dataLength + 5;
+            if (expectedLength != bytes.length) {
+                System.out.println("长度不一致，文件可能损坏");
+                return false;
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("反编译结果如下：\n");
+            sb.append("总数据段长度(dataLength): ").append(dataLength).append("\n\n");
+            List<int[]> rawRecords = new ArrayList<>();
+            List<BigDecimal[]> readableRecords = new ArrayList<>();
+
+            // 2. 准备一个List用于存储JSON数据
+            List<Map<String, Object>> jsonList = new ArrayList<>();
+
+            int index = 3;
+            int recordIndex = 1;
+            while (index < bytes.length - 2) {
+                int begin = ((bytes[index] & 0xFF) << 8) | (bytes[index + 1] & 0xFF);
+                int end = ((bytes[index + 2] & 0xFF) << 8) | (bytes[index + 3] & 0xFF);
+                int key = ((bytes[index + 4] & 0xFF) << 8) | (bytes[index + 5] & 0xFF);
+
+                BigDecimal beginTime = new BigDecimal(begin).divide(new BigDecimal(100));
+                BigDecimal endTime = new BigDecimal(end).divide(new BigDecimal(100));
+
+                sb.append("第 ").append(recordIndex).append(" 条：\n");
+                sb.append("  beginTime: ").append(beginTime).append(" 秒\n");
+                sb.append("  endTime  : ").append(endTime).append(" 秒\n");
+                sb.append("  key      : ").append(key).append("\n\n");
+
+                rawRecords.add(new int[]{
+                        bytes[index] & 0xFF,
+                        bytes[index + 1] & 0xFF,
+                        bytes[index + 2] & 0xFF,
+                        bytes[index + 3] & 0xFF,
+                        bytes[index + 4] & 0xFF,
+                        bytes[index + 5] & 0xFF
+                });
+                readableRecords.add(new BigDecimal[]{
+                        beginTime,
+                        endTime,
+                        new BigDecimal(key)
+                });
+
+                // 3. 收集JSON数据 (key 和 beginTime 毫秒)
+                // 原始 begin 只有除以 100 才是秒，说明原始单位是 10ms。
+                // 毫秒 = 原始值 * 10
+                long beginTimeMillis = begin * 10L;
+
+                Map<String, Object> jsonMap = new LinkedHashMap<>(); // 使用LinkedHashMap保持字段顺序
+                jsonMap.put("key", key);
+                jsonMap.put("beginTime", beginTimeMillis); // 存入毫秒
+                jsonList.add(jsonMap);
+
+                index += 6;
+                recordIndex++;
+            }
+
+            byte check = bytes[bytes.length - 2];
+            sb.append("校验码(check): 0x").append(String.format("%02X", check)).append("\n");
+
+            File txtOut = new File(txtOutputFile);
+            txtOut.getParentFile().mkdirs();
+            Files.write(txtOut.toPath(), sb.toString().getBytes("UTF-8"));
+
+            DtxUtils.writeExcelFinal(rawRecords, readableRecords, excelOutputFile);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(jsonOutputFile), jsonList);
+
+            System.out.println("反编译完成：");
+            System.out.println("TXT   -> " + txtOutputFile);
+            System.out.println("Excel -> " + excelOutputFile);
+            System.out.println("JSON  -> " + jsonOutputFile); // 打印JSON路径
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return true;
+    }
+
+    public List<DrumInfo> analyzeDrumInfo(MultipartFile file) {
+        try {
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || !fileName.contains(".")) {
+                throw new RuntimeException("文件格式不支持");
+            }
+            String suffix = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+            switch (suffix) {
+                case "json":
+                    return parseJsonToDrumList(file);
+                case "bin":
+                    return parseBinToDrumList(file);
+                case "xml":
+                    return parseXmlToDrumList(file);
+                default:
+                    throw new RuntimeException("不支持的文件类型: " + suffix);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("文件解析失败", e);
+        }
+    }
+
 
 }

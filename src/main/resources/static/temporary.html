@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>合同生成工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+            background: linear-gradient(135deg, #eef2f7 0%, #f8fafc 50%, #eef1f6 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1f2937;
+            padding: 20px;
+        }
+
+        /* 卡片整体 */
+        .card {
+            width: 100%;
+            max-width: 940px;
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(14px);
+            padding: 44px;
+            border-radius: 18px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.06),
+            0 6px 12px rgba(0, 0, 0, 0.04);
+            display: flex;
+            gap: 44px;
+            align-items: flex-start;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            transition: all 0.3s ease;
+        }
+
+        /* 左侧 */
+        .left-panel {
+            flex: 1;
+            min-width: 280px;
+        }
+
+        .left-panel h3 {
+            margin-bottom: 28px;
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            background: linear-gradient(135deg, #4f46e5, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 右侧预览 */
+        .right-panel {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, #f9fafb, #f3f4f6);
+            border-radius: 16px;
+            padding: 24px;
+            min-height: 360px;
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb;
+        }
+
+        .right-panel.has-content {
+            border: none;
+            background: transparent;
+            padding: 0;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            color: #9ca3af;
+            font-size: 14px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        /* 表单 */
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        /* 输入框 */
+        input, select {
+            width: 100%;
+            padding: 13px 15px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            font-size: 14px;
+            background: #fff;
+            transition: all 0.25s ease;
+            outline: none;
+        }
+
+        input:hover, select:hover {
+            border-color: #c7d2fe;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        }
+
+        input:focus, select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15),
+            0 4px 12px rgba(99, 102, 241, 0.08);
+        }
+
+        /* 按钮 */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 14px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        /* 主按钮 */
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(99, 102, 241, 0.45);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary:disabled {
+            background: #c7d2fe;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* 下载按钮 */
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            margin-top: 18px;
+            display: none;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(16, 185, 129, 0.45);
+        }
+
+        /* 日志 */
+        .log {
+            margin-top: 16px;
+            font-size: 13px;
+            min-height: 20px;
+            transition: all 0.2s ease;
+        }
+
+        /* 结果 */
+        .result-container {
+            width: 100%;
+            text-align: center;
+            display: none;
+        }
+
+        .result-container p {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 12px;
+        }
+
+        /* 图片 */
+        img.thumbnail {
+            width: 100%;
+            max-width: 420px;
+            border-radius: 12px;
+            border: 1px solid #eee;
+            cursor: zoom-in;
+            transition: all 0.25s ease;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08),
+            0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+
+        img.thumbnail:hover {
+            transform: scale(1.04);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.12),
+            0 4px 10px rgba(0, 0, 0, 0.06);
+        }
+
+        /* 弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            cursor: zoom-out;
+            backdrop-filter: blur(6px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal img {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-close-tip {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: #fff;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .card {
+                flex-direction: column;
+                padding: 28px;
+                gap: 28px;
+            }
+
+            .right-panel {
+                width: 100%;
+                min-height: 220px;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="left-panel">
+        <h3>合同生成工具</h3>
+        <div class="form-group">
+            <label for="type">合同类型</label>
+            <select id="type" onchange="togglePersonField()">
+                <option value="1">对公合同</option>
+                <option value="2">对私合同</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="userName">客户姓名/公司名称</label>
+            <input id="userName" placeholder="请输入姓名（支持中文）" autocomplete="off">
+        </div>
+
+        <div class="form-group" id="personGroup">
+            <label>法人姓名</label>
+            <input type="text" id="personName" placeholder="对私不填" autocomplete="off">
+        </div>
+
+        <button class="btn btn-primary" id="generateBtn" onclick="generate()">生成合同</button>
+        <div class="log" id="log"></div>
+    </div>
+
+    <div class="right-panel" id="rightPanel">
+        <div class="empty-state" id="emptyState">
+            <br>合同预览区
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <p>点击图片可放大预览</p>
+            <img id="resultImg" class="thumbnail" onclick="openModal()">
+            <button class="btn btn-success" id="downloadBtn" onclick="downloadImage()">保存 / 下载图片</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="imageModal" onclick="closeModal()">
+    <div class="modal-close-tip">点击任意位置关闭 ✕</div>
+    <img id="modalImg">
+</div>
+
+<script>
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !document.getElementById('generateBtn').disabled) {
+            generate();
+        }
+    });
+
+    function togglePersonField() {
+        const type = document.getElementById('type').value;
+        const personGroup = document.getElementById('personGroup');
+        if (type === "2") {
+            personGroup.classList.add('hidden');
+        } else {
+            personGroup.classList.remove('hidden');
+        }
+    }
+
+    function getTimestamp() {
+        const now = new Date();
+        return now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0') +
+            String(now.getSeconds()).padStart(2, '0');
+    }
+
+    function generate() {
+        const userNameInput = document.getElementById('userName');
+        const personNameInput = document.getElementById('personName');
+        const type = document.getElementById('type').value;
+        const log = document.getElementById('log');
+
+        const rightPanel = document.getElementById('rightPanel');
+        const emptyState = document.getElementById('emptyState');
+        const resultContainer = document.getElementById('resultContainer');
+        const img = document.getElementById('resultImg');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        const userName = userNameInput.value.trim();
+        const personName = personNameInput.value.trim();
+
+        if (!userName) {
+            alert("请输入客户姓名！");
+            userNameInput.focus();
+            return;
+        }
+
+        // 初始化状态
+        generateBtn.disabled = true;
+        generateBtn.innerText = "生成中...";
+        resultContainer.style.display = "none";
+        downloadBtn.style.display = "none";
+        emptyState.style.display = "block";
+        rightPanel.classList.remove('has-content');
+
+        const receiverNo = getTimestamp();
+        const url = `http://localhost:9001/tool/generateContract?userName=${encodeURIComponent(userName)}&personName=${encodeURIComponent(personName)}&type=${type}&receiverNo=${receiverNo}`;
+
+        log.style.color = "#007AFF";
+        log.innerText = "正在生成，请稍等...";
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 200) {
+                    log.style.color = "#007AFF";
+                    log.innerText = "生成成功，正在加载图片...";
+                    const imgUrl = `http://localhost:9001/contract/file/${encodeURIComponent(userName)}${receiverNo}.jpg`;
+
+                    // 预加载图片
+                    const tempImg = new Image();
+                    tempImg.onload = () => {
+                        img.src = imgUrl;
+                        emptyState.style.display = "none";
+                        rightPanel.classList.add('has-content');
+                        resultContainer.style.display = "block";
+                        downloadBtn.style.display = "block";
+                        log.style.color = "#10b981";
+                        log.innerText = "合同生成并加载完毕";
+                    };
+                    tempImg.onerror = () => {
+                        log.style.color = "#ef4444";
+                        log.innerText = "图片加载失败，请检查服务器存储状态。";
+                    }
+                    tempImg.src = imgUrl;
+
+                } else {
+                    log.style.color = "#ef4444";
+                    log.innerText = "生成失败：" + (data.msg || "未知错误");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                log.style.color = "#ef4444";
+                log.innerText = "网络请求异常，请检查控制台或网络配置。";
+            })
+            .finally(() => {
+                generateBtn.disabled = false;
+                generateBtn.innerText = "生成合同";
+            });
+    }
+
+    function openModal() {
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+        const resultImg = document.getElementById('resultImg');
+
+        modalImg.src = resultImg.src;
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('imageModal');
+        modal.classList.remove('active');
+    }
+
+    function downloadImage() {
+        const imgUrl = document.getElementById('resultImg').src;
+        const userName = document.getElementById('userName').value.trim();
+        if (!imgUrl) return;
+
+        const log = document.getElementById('log');
+        log.innerText = "正在处理下载...";
+
+        fetch(imgUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `合同_${userName}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                log.style.color = "#10b981";
+                log.innerText = "下载触发成功";
+            })
+            .catch(() => {
+                const a = document.createElement('a');
+                a.href = imgUrl;
+                a.download = `合同_${userName}.jpg`;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                log.style.color = "#10b981";
+                log.innerText = "已在新标签页打开，请右键另存为";
+            });
+    }
+</script>
+
+</body>
+</html>

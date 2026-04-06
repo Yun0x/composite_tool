@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicXML Studio Pro</title>
+    <style>
+        :root {
+            --bg-base: #f5f7fa;
+            --bg-panel: rgba(255, 255, 255, 0.9);
+            --border-color: #e5e7eb;
+            --primary: #07c160; /* 微信绿 */
+            --secondary: #10aeff; /* 微信蓝 */
+            --accent: #34c759;
+            --text-main: #1f2937;
+            --text-dim: #6b7280;
+            --success: #07c160;
+            --success-bg: rgba(7, 193, 96, 0.1);
+            --error: #fa5151;
+            --error-bg: rgba(250, 81, 81, 0.1);
+            --warning: #ff9f00;
+            --warning-bg: rgba(255, 159, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'SF Pro Display', 'Inter', -apple-system, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: grid;
+            grid-template-columns: minmax(520px, 35%) 1fr;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        /* 背景氛围光 */
+        body::before, body::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+
+        body::before {
+            width: 60vw;
+            height: 60vw;
+            background: var(--primary);
+            top: -20%;
+            left: -10%;
+        }
+
+        body::after {
+            width: 50vw;
+            height: 50vw;
+            background: var(--accent);
+            bottom: -20%;
+            right: -10%;
+        }
+
+        .sidebar {
+            background: #ffffff;
+            border-right: 1px solid var(--border-color);
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            overflow-y: auto;
+        }
+
+        header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--primary);
+            -webkit-background-clip: text;
+            /*-webkit-text-fill-color: transparent;*/
+            margin-bottom: 8px;
+        }
+
+        header p {
+            font-size: 14px;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .drop-zone {
+            padding: 40px 20px;
+            background: #fafafa;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .drop-zone:hover {
+            background: #f0fdf4;
+            border-color: var(--primary);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .drop-zone svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--primary);
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group.full {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            color: var(--text-main);
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.2s ease;
+        }
+
+        input::placeholder {
+            color: rgba(148, 163, 184, 0.4);
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(7, 193, 96, 0.15);
+        }
+
+        .btn-run {
+            margin-top: auto;
+            padding: 16px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            box-shadow: none;
+        }
+
+        .btn-run:hover:not(:disabled) {
+            background: #06ad56;
+            transform: none;
+        }
+
+        .btn-run:disabled {
+            background: #cbd5e1;
+            color: #fff;
+        }
+
+        /* ================= 右侧数据流 ================= */
+        .content {
+            padding: 50px 60px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .list-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        #stats {
+            background: rgba(0, 242, 254, 0.1);
+            color: var(--primary);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid rgba(0, 242, 254, 0.2);
+        }
+
+        .queue-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding-right: 15px;
+        }
+
+        .queue-item {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            padding: 20px 24px;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            align-items: center;
+            gap: 20px;
+            transition: background 0.2s ease;
+        }
+
+        .queue-item:hover {
+            background: #f9fafb;
+            transform: none;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .item-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .item-info h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .item-info p {
+            font-size: 13px;
+            color: var(--text-dim);
+            font-family: monospace; /* 文件名用等宽字体更显专业 */
+        }
+
+        /* 状态标签 (暗黑版) */
+        .status-pill {
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 110px;
+            text-align: center;
+            border: 1px solid transparent;
+        }
+
+        .status-pill.ready {
+            background: var(--success-bg);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .status-pill.missing {
+            background: var(--error-bg);
+            color: var(--error);
+            border-color: rgba(244, 63, 94, 0.3);
+        }
+
+        .status-pill.loading {
+            background: var(--warning-bg);
+            color: var(--warning);
+            border-color: rgba(234, 179, 8, 0.3);
+            animation: pulseDark 1.5s infinite;
+        }
+
+        .status-pill.success {
+            background: var(--primary-glow);
+            color: var(--primary);
+            border-color: rgba(0, 242, 254, 0.4);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
+        }
+
+        @keyframes pulseDark {
+            0% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4);
+            }
+            70% {
+                opacity: 0.8;
+                box-shadow: 0 0 0 6px rgba(234, 179, 8, 0);
+            }
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+            }
+        }
+
+        /* 暗黑滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+<aside class="sidebar">
+    <header>
+        <h1>MusicXML Tool</h1>
+        <p>MusicXML和MP3生成配套预览歌曲+压缩+地鼠模式+专业模式</p>
+    </header>
+
+    <div class="drop-zone" id="dropZone">
+        <svg viewBox="0 0 24 24">
+            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+        </svg>
+        <h3 style="margin-bottom: 5px; font-weight: 600;">拖入工作区</h3>
+        <span style="font-size: 12px; color: var(--text-dim)">支持批量放入 .mp3 与 .xml/musicxml</span>
+        <input type="file" id="fileInput" multiple accept=".mp3,.xml,.musicxml" style="display:none">
+    </div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>第几秒开始地鼠</label>
+            <input type="number" id="beginTime" value="1">
+        </div>
+        <div class="form-group">
+            <label>提前几秒结束地鼠</label>
+            <input type="number" id="endTime" value="1">
+        </div>
+        <div class="form-group">
+            <label>预览开始(秒)</label>
+            <input type="number" id="startSecond" placeholder="留空不生成">
+        </div>
+        <div class="form-group">
+            <label>预览时长(秒)</label>
+            <input type="number" id="duration" placeholder="留空不生成">
+        </div>
+        <div class="form-group full">
+            <label>延迟时间(毫秒，支持正反)</label>
+            <input type="number" id="delayTime" placeholder="不传默认为0">
+        </div>
+        <div class="form-group full">
+            <label>保存文件夹（会单独创建文件夹）</label>
+            <input type="text" id="outputDir" value="D:\Downloads\离开地球表面测试json">
+        </div>
+    </div>
+
+    <button class="btn-run" id="submitBtn" disabled>开始启动</button>
+</aside>
+
+<main class="content">
+    <div class="list-header">
+        <h2>队列内容</h2>
+        <div id="stats">0个已完成</div>
+    </div>
+
+    <div class="queue-list" id="queueList">
+        <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); opacity: 0.3;">
+            <svg style="width: 80px; height: 80px; fill: currentColor; margin-bottom: 20px;" viewBox="0 0 24 24">
+                <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+            </svg>
+            <p style="font-size: 16px; letter-spacing: 1px;">等待上传文件</p>
+        </div>
+    </div>
+</main>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const queueList = document.getElementById('queueList');
+    const submitBtn = document.getElementById('submitBtn');
+    const stats = document.getElementById('stats');
+
+    let groups = [];
+
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFiles(e.target.files);
+
+    dropZone.ondragover = (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = "var(--primary)";
+        dropZone.style.background = "rgba(0, 242, 254, 0.05)";
+    };
+    dropZone.ondragleave = () => {
+        dropZone.style.borderColor = "rgba(255,255,255,0.15)";
+        dropZone.style.background = "rgba(0, 0, 0, 0.2)";
+    };
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = "rgba(255,255,255,0.15)";
+        dropZone.style.background = "rgba(0, 0, 0, 0.2)";
+        handleFiles(e.dataTransfer.files);
+    };
+
+    function handleFiles(files) {
+        const allFiles = Array.from(files);
+        const mp3s = allFiles.filter(f => f.name.toLowerCase().endsWith('.mp3'));
+        const xmls = allFiles.filter(f => f.name.toLowerCase().endsWith('.xml') || f.name.toLowerCase().endsWith('.musicxml'));
+
+        groups = mp3s.map(mp3 => {
+            const baseName = mp3.name.substring(0, mp3.name.lastIndexOf('.'));
+            const matchedXml = xmls.find(x => x.name.substring(0, x.name.lastIndexOf('.')).toLowerCase() === baseName.toLowerCase());
+            return {
+                id: Math.random().toString(36).substr(2, 5),
+                baseName,
+                mp3: mp3,
+                xml: matchedXml || null,
+                status: matchedXml ? 'ready' : 'missing'
+            };
+        });
+        render();
+    }
+
+    function render() {
+        const readyCount = groups.filter(g => g.status === 'ready').length;
+        stats.innerText = `${readyCount} 已完成`;
+        submitBtn.disabled = readyCount === 0;
+
+        if (groups.length === 0) return;
+        queueList.innerHTML = '';
+        groups.forEach(g => {
+            const item = document.createElement('div');
+            item.className = 'queue-item';
+            item.innerHTML = `
+                <div class="item-icon">🎵</div>
+                <div class="item-info">
+                    <h4>${g.baseName}</h4>
+                    <p>${g.mp3.name} &nbsp;|&nbsp; ${g.xml ? g.xml.name : '<span style="color:var(--error)">xml没匹上</span>'}</p>
+                </div>
+                <div class="status-pill ${g.status}" id="status-${g.id}">${g.status === 'ready' ? '待转化' : '没匹上'}</div>
+            `;
+            queueList.appendChild(item);
+        });
+    }
+
+    submitBtn.onclick = async () => {
+        const readyGroups = groups.filter(g => g.status === 'ready');
+        submitBtn.disabled = true;
+        submitBtn.innerText = "处理中...";
+
+        for (const g of readyGroups) {
+            const pill = document.getElementById(`status-${g.id}`);
+            pill.className = "status-pill loading";
+            pill.innerText = "处理中...";
+
+            const fd = new FormData();
+            fd.append('mp3', g.mp3);
+            fd.append('mp3Temp', g.mp3);
+            fd.append('xml', g.xml);
+            // fd.append('xmlTmp', g.xml);
+
+            fd.append('outputDir', document.getElementById('outputDir').value);
+            fd.append('beginTime', document.getElementById('beginTime').value);
+            fd.append('endTime', document.getElementById('endTime').value);
+
+            const sSec = document.getElementById('startSecond').value;
+            const dur = document.getElementById('duration').value;
+            const delayTime = document.getElementById('delayTime').value;
+            if (sSec) fd.append('startSecond', sSec);
+            if (dur) fd.append('duration', dur);
+            if (delayTime) fd.append('delayTime', delayTime || 0);
+            try {
+                const response = await fetch('http://localhost:9001/tool/fullProcessMusicXml', {
+                    method: 'POST',
+                    body: fd
+                });
+                const result = await response.json();
+
+                if (result.code === 200 && result.data.overallSuccess) {
+                    pill.className = "status-pill success";
+                    pill.innerText = "成功";
+                } else {
+                    pill.className = "status-pill missing";
+                    pill.innerText = "失败";
+                    console.error(g.baseName + " Error:", result.message);
+                }
+            } catch (err) {
+                pill.className = "status-pill missing";
+                pill.innerText = "NET ERROR";
+            }
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.innerText = "开始一键生成";
+    };
+</script>
+</body>
+</html>

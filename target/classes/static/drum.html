@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Lachesism Drum Station - Pro Scrolling DAW</title>
+    <style>
+        /* --- 1. 基础全局样式 --- */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px 0;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .main-wrapper {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* 上半部分保持最大 1200px 居中 */
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            gap: 40px;
+            align-items: stretch;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+
+        /* --- 2. 左侧鼓区 --- */
+        .drum-area {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .row, .bottom-row {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 15px;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .circle, .rectangle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.05s, box-shadow 0.05s;
+        }
+
+        .circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+        }
+
+        .rectangle {
+            width: 60px;
+            height: 90px;
+        }
+
+        .black, .black-rect {
+            background-color: black;
+            color: white;
+        }
+
+        .white, .white-rect {
+            background-color: white;
+            color: black;
+            border: 2px solid black;
+        }
+
+        .active {
+            transform: scale(0.92);
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.8);
+            filter: brightness(1.2);
+        }
+
+        .key-hint {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+        }
+
+        /* --- 3. 右侧控制区 --- */
+        .upload-area {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-panel {
+            padding: 25px;
+            background: #fafafa;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border: 1px solid #eee;
+        }
+
+        .upload-box {
+            width: 100%;
+            height: 100px;
+            border: 3px dashed #FF477E;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #FF477E;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            background: #fff5f8;
+        }
+
+        .upload-box:hover {
+            background: #ffeef3;
+            transform: scale(1.02);
+        }
+
+        .player-controls {
+            width: 100%;
+        }
+
+        #progressBar {
+            width: 100%;
+            height: 8px;
+            border-radius: 10px;
+            accent-color: #00D2FC;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 800;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .volume-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            background: #fff;
+            padding: 8px 5px;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .volume-control input {
+            writing-mode: bt-lr;
+            appearance: slider-vertical;
+            width: 6px;
+            height: 70px;
+            cursor: pointer;
+        }
+
+        #bgmVolumeSlider {
+            accent-color: #FFBE0B;
+        }
+
+        #drumVolumeSlider {
+            accent-color: #9B59B6;
+        }
+
+        .btn-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        button {
+            padding: 8px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 12px;
+        }
+
+        #playBtn {
+            background: #00D2FC;
+            color: white;
+        }
+
+        #pauseBtn {
+            background: #FFBE0B;
+            color: white;
+        }
+
+        #stopBtn {
+            background: #FF477E;
+            color: white;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }
+
+        #result {
+            flex: 1;
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 10px;
+            box-sizing: border-box;
+            color: #00D2FC;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            overflow-y: auto;
+        }
+
+        .current-item {
+            color: #FF477E;
+            font-weight: bold;
+            font-size: 16px;
+            padding: 5px;
+            border-left: 4px solid #FF477E;
+            background: rgba(255, 71, 126, 0.1);
+        }
+
+        .next-item {
+            color: #FFBE0BFF;
+            padding: 5px;
+            margin-top: 3px;
+            opacity: 0.9;
+        }
+        .second-item{
+            color: #d2d2d2;
+            padding: 5px;
+            margin-top: 3px;
+            opacity: 0.8;
+        }
+        .empty-item {
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* --- 4. 极致狠活：95vw 滚动音轨 --- */
+        .timeline-wrapper {
+            position: relative;
+            width: 95vw; /* 占满屏幕95%宽度 */
+            height: 200px;
+            background: #151515;
+            border-radius: 16px;
+            overflow: hidden; /* 核心：遮罩隐藏超出的部分 */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            cursor: crosshair;
+        }
+
+        /* 随时间滚动的内部轨道 */
+        .scrolling-track {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            will-change: transform; /* 开启 GPU 硬件加速，保证滚动丝滑 */
+            /* transform 在 JS 中实时控制 */
+        }
+
+        .scrolling-track canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* 固定在屏幕上的物理游标（不再移动，而是背景动） */
+        #fixedPlayhead {
+            position: absolute;
+            top: 0;
+            /* JS 会将其定位在 20% 的位置 */
+            width: 2px;
+            height: 100%;
+            background: #00D2FC;
+            box-shadow: 0 0 15px #00D2FC, 0 0 5px #fff;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 游标头部的发光三角形 */
+        #fixedPlayhead::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -6px;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-top: 10px solid #00D2FC;
+        }
+
+        #waveformStatus {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-family: monospace;
+            font-size: 14px;
+            pointer-events: none;
+            letter-spacing: 2px;
+            z-index: 20;
+        }
+
+        #clickTimeLabel {
+            position: absolute;
+            top: 4px;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #00D2FC;
+            font-family: Consolas, monospace;
+            font-size: 11px;
+            padding: 3px 6px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 30;
+            box-shadow: 0 0 8px rgba(0, 210, 252, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <div class="container">
+        <div class="drum-area">
+            <div class="row">
+                <div class="item">
+                    <div class="circle black" data-id="1">1<br>Hi-Hat</div>
+                    <span class="key-hint">A</span></div>
+                <div class="item">
+                    <div class="circle black" data-id="2">2<br>Crash</div>
+                    <span class="key-hint">S</span></div>
+                <div class="item">
+                    <div class="circle black" data-id="5">5<br>Ride</div>
+                    <span class="key-hint">D</span></div>
+                <div class="item">
+                    <div class="circle black" data-id="6">6<br>Crash1</div>
+                    <span class="key-hint">F</span></div>
+            </div>
+            <div class="row">
+                <div class="item">
+                    <div class="circle white" data-id="3">3<br>Snare</div>
+                    <span class="key-hint">J</span></div>
+                <div class="item">
+                    <div class="circle white" data-id="4">4<br>Tom1</div>
+                    <span class="key-hint">K</span></div>
+                <div class="item">
+                    <div class="circle white" data-id="7">7<br>Tom2</div>
+                    <span class="key-hint">L</span></div>
+                <div class="item">
+                    <div class="circle white" data-id="8">8<br>Tom3</div>
+                    <span class="key-hint">;</span></div>
+            </div>
+            <div class="bottom-row">
+                <div class="item">
+                    <div class="rectangle black-rect" data-id="9">9<br>H-H Close</div>
+                    <span class="key-hint">C</span></div>
+                <div class="item">
+                    <div class="rectangle white-rect" data-id="10">10<br>Kick</div>
+                    <span class="key-hint">N</span></div>
+            </div>
+        </div>
+
+        <div class="upload-area">
+            <div class="control-panel">
+                <div class="upload-box" id="uploadArea">
+                    <span style="font-size: 24px;">⚡</span>
+                    <strong>点击上传 音频/谱面</strong>
+                </div>
+                <input type="file" id="fileInput" accept=".xml,.json,.bin,.mp3,.wav" multiple/>
+
+                <div class="player-controls">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #fff; padding: 6px 12px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                        <span style="font-size: 12px; font-weight: bold; color: #555;">谱面偏移 (毫秒):</span>
+                        <input type="number" id="delayInput" value="-200" step="10"
+                               style="width: 70px; padding: 4px; border-radius: 6px; border: 1px solid #ddd; text-align: center; font-family: monospace; font-size: 12px; outline: none;">
+                    </div>
+                    <input type="range" id="progressBar" min="0" max="100" value="0" step="0.1">
+                    <div class="time-display">
+                        <span id="currentTimeDisplay">0.0s</span>
+                        <span id="maxTimeDisplay">0.0s</span>
+                    </div>
+
+                    <div class="action-bar">
+                        <div class="volume-control">
+                            <input type="range" id="bgmVolumeSlider" min="0" max="1" step="0.01" value="0.7">
+                            <span style="font-size: 9px; font-weight: bold;">BGM</span>
+                        </div>
+                        <div class="volume-control">
+                            <input type="range" id="drumVolumeSlider" min="0" max="1" step="0.01" value="1.0">
+                            <span style="font-size: 9px; font-weight: bold;">鼓声</span>
+                        </div>
+                        <div class="btn-group">
+                            <button id="playBtn">开始</button>
+                            <button id="pauseBtn">暂停</button>
+                            <button id="stopBtn">结束</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="result">
+                <div class="empty-item">> 准备</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="timeline-wrapper" id="timelineWrapper">
+        <div id="waveformStatus">等待加载...</div>
+
+        <div id="fixedPlayhead"></div>
+        <div id="clickTimeLabel"></div>
+
+        <div class="scrolling-track" id="scrollingTrack">
+            <canvas id="waveformCanvas"></canvas>
+            <canvas id="notesCanvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const clickTimeLabel = document.getElementById('clickTimeLabel');
+    const keyMap = {
+        'a': '1',
+        's': '2',
+        'd': '5',
+        'f': '6',
+        'j': '3',
+        'k': '4',
+        'l': '7',
+        ';': '8',
+        'c': '9',
+        'n': '10'
+    };
+    const sounds = {
+        '1': './sounds/Hi-Hat Open.wav',
+        '2': './sounds/Clash2.wav',
+        '3': './sounds/Snare Drum.wav',
+        '4': './sounds/tom1_HighTom.wav',
+        '5': './sounds/Ride Cymbal.wav',
+        '6': './sounds/Crash1 Cymbal.wav',
+        '7': './sounds/tom2_MidTom.wav',
+        '8': './sounds/Floor Tom.wav',
+        '9': './sounds/Hi-Hat Closed.wav',
+        '10': './sounds/Kick Drum.wav'
+    };
+    const audioNodes = {};
+    Object.keys(sounds).forEach(id => {
+        audioNodes[id] = new Audio(sounds[id]);
+    });
+    const drumVolumeSlider = document.getElementById('drumVolumeSlider');
+
+    function playDrum(id) {
+        const el = document.querySelector(`[data-id="${id}"]`);
+        if (!el) return;
+        el.classList.add('active');
+        setTimeout(() => el.classList.remove('active'), 100);
+        const audio = audioNodes[id];
+        if (audio) {
+            audio.currentTime = 0;
+            audio.volume = drumVolumeSlider.value;
+            audio.play().catch(e => {
+            });
+        }
+    }
+
+    window.addEventListener('keydown', e => {
+        // --- 新增：空格键控制播放/暂停 ---
+        if (e.code === 'Space' || e.key === ' ') {
+            e.preventDefault(); // 极其重要：防止按下空格时网页向下滚动
+
+            if (maxDurationMs > 0) { // 确保已经加载了音频或谱面
+                if (isPlaying) {
+                    pausePlayback();
+                } else {
+                    startPlayback();
+                }
+            }
+            return; // 命中空格后直接返回，不再执行后续打鼓逻辑
+        }
+        if (keyMap[e.key.toLowerCase()]) {
+            playDrum(keyMap[e.key.toLowerCase()]);
+        }
+    });
+    document.querySelectorAll('[data-id]').forEach(el => {
+        el.addEventListener('mousedown', () => playDrum(el.dataset.id));
+    });
+
+    let bgmAudio = new Audio();
+    let rawDrumData = [];
+    let parsedDrumData = [];
+    let playTimers = [];
+    let clockInterval = null;
+    let isPlaying = false;
+    let isDragging = false;
+    let maxDurationMs = 0;
+    let playbackBaseTime = 0;
+    let currentOffsetMs = 0;
+    let decodedAudioBuffer = null;
+
+    // --- 滚动音轨核心变量 ---
+    const VISIBLE_SECONDS = 30; // 视口内固定显示 30 秒的物理长度
+    const PLAYHEAD_PCT = 0.2;   // 游标固定在左侧 20%
+    let pxPerSec = 0;           // 每秒代表多少像素
+    let playheadOffsetPx = 0;   // 游标物理偏移量
+    let trackWidth = 0;         // 内部履带总宽度
+
+    const progressBar = document.getElementById('progressBar');
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const maxTimeDisplay = document.getElementById('maxTimeDisplay');
+    const resultDiv = document.getElementById('result');
+    const bgmVolumeSlider = document.getElementById('bgmVolumeSlider');
+    const delayInput = document.getElementById('delayInput');
+    const waveformStatus = document.getElementById('waveformStatus');
+
+    bgmVolumeSlider.addEventListener('input', (e) => bgmAudio.volume = e.target.value);
+    delayInput.addEventListener('change', () => {
+        if (rawDrumData.length > 0) {
+            preprocessData(rawDrumData);
+            updateMaxDuration();
+            calculateTimelineDimensions();
+            stopPlayback();
+            drawNotes();
+            updateScrollUI(0);
+        }
+    });
+
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => {
+        if (fileInput.files.length) handleFiles(fileInput.files);
+    });
+
+    function handleFiles(files) {
+        let audioFile = null, dataFile = null;
+        for (let file of files) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (['mp3', 'wav'].includes(ext)) audioFile = file;
+            else if (['xml', 'json', 'bin'].includes(ext)) dataFile = file;
+        }
+
+        if (audioFile) {
+            bgmAudio.src = URL.createObjectURL(audioFile);
+            bgmAudio.onloadedmetadata = () => {
+                updateMaxDuration();
+                calculateTimelineDimensions();
+            };
+            processAudioForWaveform(audioFile);
+        }
+
+        if (dataFile) {
+            const formData = new FormData();
+            formData.append('file', dataFile);
+            fetch('/tool/analyzeDrumInfo', {method: 'POST', body: formData})
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 200 && data.data) {
+                        rawDrumData = data.data;
+                        preprocessData(rawDrumData);
+                        updateMaxDuration();
+                        calculateTimelineDimensions();
+                        stopPlayback();
+                    }
+                }).catch(err => console.error(err));
+        }
+    }
+
+    async function processAudioForWaveform(file) {
+        waveformStatus.style.display = 'block';
+        waveformStatus.innerText = ">> 解析音频波形中... <<";
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            decodedAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            waveformStatus.style.display = 'none';
+            calculateTimelineDimensions();
+        } catch (e) {
+            waveformStatus.innerText = "波形解析失败";
+            console.error(e);
+        }
+    }
+
+    // --- 计算超长画布的尺寸 ---
+    function calculateTimelineDimensions() {
+        if (maxDurationMs <= 0) return;
+        const wrapper = document.getElementById('timelineWrapper');
+        const track = document.getElementById('scrollingTrack');
+        const wfCanvas = document.getElementById('waveformCanvas');
+        const noteCanvas = document.getElementById('notesCanvas');
+        const playhead = document.getElementById('fixedPlayhead');
+
+        const wrapperWidth = wrapper.clientWidth;
+
+        // 游标位置
+        playheadOffsetPx = wrapperWidth * PLAYHEAD_PCT;
+        playhead.style.left = `${playheadOffsetPx}px`;
+
+        // 核心：30秒占满整个 wrapperWidth
+        pxPerSec = wrapperWidth / VISIBLE_SECONDS;
+
+        const maxDurSec = maxDurationMs / 1000;
+        trackWidth = maxDurSec * pxPerSec;
+
+        // 浏览器 Canvas 极限保护 (防止长达10分钟的歌导致浏览器崩溃)
+        if (trackWidth > 16000) {
+            trackWidth = 16000;
+            pxPerSec = trackWidth / maxDurSec;
+        }
+
+        // 留出尾部空间，让最后一秒也能滚出屏幕
+        const finalCanvasWidth = trackWidth + (wrapperWidth - playheadOffsetPx);
+
+        track.style.width = `${finalCanvasWidth}px`;
+        wfCanvas.width = finalCanvasWidth;
+        wfCanvas.height = wrapper.clientHeight;
+        noteCanvas.width = finalCanvasWidth;
+        noteCanvas.height = wrapper.clientHeight;
+
+        drawWaveform();
+        drawNotes();
+        updateScrollUI(currentOffsetMs);
+    }
+
+    // --- 绘制网格与波形 ---
+    function drawWaveform() {
+        if (!decodedAudioBuffer) return;
+        const canvas = document.getElementById('waveformCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 绘制时间网格背景 (每 1 秒一根暗线)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        for (let t = 0; t <= maxDurationMs / 1000; t += 1) {
+            const gx = t * pxPerSec;
+            ctx.fillRect(gx, 0, 1, canvas.height);
+            // 每 5 秒标一次时间刻度
+            if (t % 5 === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.font = '10px Consolas';
+                ctx.fillText(`${t}s`, gx + 4, canvas.height - 10);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            }
+        }
+
+        // 绘制波形
+        const data = decodedAudioBuffer.getChannelData(0);
+        const audioDurMs = decodedAudioBuffer.duration * 1000;
+        const waveDrawWidth = (audioDurMs / 1000) * pxPerSec;
+        const step = Math.ceil(data.length / waveDrawWidth);
+        const amp = canvas.height / 2;
+
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, "rgba(0, 210, 252, 0.8)");
+        grad.addColorStop(0.5, "rgba(0, 210, 252, 0.2)");
+        grad.addColorStop(1, "rgba(0, 210, 252, 0.8)");
+        ctx.fillStyle = grad;
+
+        for (let i = 0; i < waveDrawWidth; i++) {
+            let min = 1.0, max = -1.0;
+            for (let j = 0; j < step; j++) {
+                const idx = (i * step) + j;
+                if (idx < data.length) {
+                    if (data[idx] < min) min = data[idx];
+                    if (data[idx] > max) max = data[idx];
+                }
+            }
+            const y = (1 + min) * amp;
+            const h = Math.max(1, (max - min) * amp);
+            ctx.fillRect(i, y, 1, h);
+        }
+    }
+
+    function drawNotes() {
+        const canvas = document.getElementById('notesCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (maxDurationMs <= 0 || !parsedDrumData.length) return;
+
+        parsedDrumData.forEach((item, index) => {
+            if (item.beginTime < 0 || item.beginTime > maxDurationMs) return;
+
+            // X坐标按照物理比例计算
+            const x = (item.beginTime / 1000) * pxPerSec;
+
+            ctx.fillStyle = 'rgb(215,255,222)';
+            ctx.fillRect(x, 0, 0.5, canvas.height);
+
+            ctx.fillStyle = '#FFBE0B';
+            ctx.font = 'bold 11px Consolas';
+            const yOffset = 20 + (index % 8) * 18;
+            ctx.fillText(item.displayKeys, x + 5, yOffset);
+
+            ctx.fillStyle = '#FF477E';
+            ctx.beginPath();
+            ctx.arc(x + 1, yOffset - 4, 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    window.addEventListener('resize', calculateTimelineDimensions);
+
+    function preprocessData(list) {
+        const drumValues = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
+        const delayOffsetMs = parseInt(delayInput.value) || 0;
+        parsedDrumData = list.map(item => {
+            const totalKey = parseInt(item.key);
+            const activeDrums = [];
+            drumValues.forEach((val, index) => {
+                if ((totalKey & val) === val) activeDrums.push(index + 1);
+            });
+            let adjustedTime = parseInt(item.beginTime) + delayOffsetMs;
+            return {
+                beginTime: adjustedTime,
+                key: totalKey,
+                displayKeys: `${activeDrums.join(',')}`,
+                secTime: (adjustedTime / 1000).toFixed(2)
+            };
+        }).sort((a, b) => a.beginTime - b.beginTime);
+    }
+
+    function updateMaxDuration() {
+        let bgmTime = bgmAudio.duration ? bgmAudio.duration * 1000 : 0;
+        let drumTime = parsedDrumData.length > 0 ? parsedDrumData[parsedDrumData.length - 1].beginTime + 1000 : 0;
+        maxDurationMs = Math.max(bgmTime, drumTime);
+        progressBar.max = maxDurationMs / 1000;
+        maxTimeDisplay.textContent = (maxDurationMs / 1000).toFixed(1) + 's';
+    }
+
+    function updateDynamicDisplay(nowMs) {
+        if (!parsedDrumData.length) return;
+        let currentIndex = -1;
+        for (let i = 0; i < parsedDrumData.length; i++) {
+            if (parsedDrumData[i].beginTime <= nowMs) currentIndex = i;
+            else break;
+        }
+        let html = '';
+        if (currentIndex >= 0) {
+            const cur = parsedDrumData[currentIndex];
+            html += `<div class="current-item">▶ ${cur.secTime}s | ${cur.displayKeys}</div>`;
+        }
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < parsedDrumData.length) {
+            const nxt = parsedDrumData[nextIndex];
+            html += `<div class="next-item">▷ ${nxt.secTime}s | ${nxt.displayKeys}</div>`;
+            const nxt2 = parsedDrumData[nextIndex+1];
+            const nxt3 = parsedDrumData[nextIndex+2];
+            html += `<div class="second-item">▷ ${nxt2.secTime}s | ${nxt2.displayKeys}</div>`;
+            html += `<div class="second-item">▷ ${nxt3.secTime}s | ${nxt3.displayKeys}</div>`;
+        }
+        resultDiv.innerHTML = html;
+    }
+
+    // --- 核心动画：履带平移 ---
+    function updateScrollUI(nowMs) {
+        if (maxDurationMs <= 0) return;
+        // 计算当前时间在画布上应该走过的像素距离
+        const currentPx = (nowMs / 1000) * pxPerSec;
+        // 游标位置是固定的，所以画布需要向左偏移 (游标位置 - 当前进度)
+        const transformX = playheadOffsetPx - currentPx;
+        document.getElementById('scrollingTrack').style.transform = `translateX(${transformX}px)`;
+    }
+
+    function startPlayback() {
+        if (isPlaying || maxDurationMs <= 0) return;
+        isPlaying = true;
+        playbackBaseTime = Date.now();
+        if (bgmAudio.src) {
+            bgmAudio.currentTime = currentOffsetMs / 1000;
+            bgmAudio.play().catch(e => {
+            });
+        }
+        const drumValues = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
+        parsedDrumData.forEach(item => {
+            if (item.beginTime >= currentOffsetMs) {
+                const t = setTimeout(() => {
+                    drumValues.forEach((val, index) => {
+                        if ((item.key & val) === val) playDrum((index + 1).toString());
+                    });
+                }, item.beginTime - currentOffsetMs);
+                playTimers.push(t);
+            }
+        });
+
+        function renderLoop() {
+            if (!isPlaying || isDragging) return;
+            const nowMs = currentOffsetMs + (Date.now() - playbackBaseTime);
+            if (nowMs >= maxDurationMs) {
+                stopPlayback();
+                return;
+            }
+            progressBar.value = nowMs / 1000;
+            currentTimeDisplay.textContent = (nowMs / 1000).toFixed(1) + 's';
+            updateDynamicDisplay(nowMs);
+            updateScrollUI(nowMs); // 实时滚动
+            requestAnimationFrame(renderLoop); // 用 requestAnimationFrame 保证60fps丝滑滚动
+        }
+
+        requestAnimationFrame(renderLoop);
+    }
+
+    function pausePlayback() {
+        if (!isPlaying) return;
+        isPlaying = false;
+        playTimers.forEach(clearTimeout);
+        playTimers = [];
+        bgmAudio.pause();
+        currentOffsetMs += (Date.now() - playbackBaseTime);
+    }
+
+    function stopPlayback() {
+        isPlaying = false;
+        playTimers.forEach(clearTimeout);
+        playTimers = [];
+        bgmAudio.pause();
+        bgmAudio.currentTime = 0;
+        currentOffsetMs = 0;
+        progressBar.value = 0;
+        currentTimeDisplay.textContent = '0.0s';
+        updateDynamicDisplay(0);
+        updateScrollUI(0);
+    }
+
+    progressBar.addEventListener('input', (e) => {
+        isDragging = true;
+        const seekMs = parseFloat(e.target.value) * 1000;
+        currentTimeDisplay.textContent = (seekMs / 1000).toFixed(1) + 's';
+        updateDynamicDisplay(seekMs);
+        updateScrollUI(seekMs);
+    });
+
+    progressBar.addEventListener('change', (e) => {
+        const seekMs = parseFloat(e.target.value) * 1000;
+        const wasPlaying = isPlaying;
+        if (isPlaying) pausePlayback();
+        currentOffsetMs = seekMs;
+        if (wasPlaying) startPlayback();
+        isDragging = false;
+    });
+
+    document.getElementById('timelineWrapper').addEventListener('mousedown', (e) => {
+        if (maxDurationMs <= 0) return;
+
+        const timelineWrapper = e.currentTarget;
+        let hasDragged = false;
+        const startX = e.clientX;
+        const initialDelay = parseInt(delayInput.value) || 0;
+        const wasPlaying = isPlaying;
+
+        // 记录点击时的初始相对位置，用于后续判断是否只是单纯的点击
+        const rect = timelineWrapper.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+
+        // --- 定义拖拽时的移动事件 ---
+        const handleMouseMove = (moveEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+
+            // 滑动超过 3 像素，判定为正在“拖拽调整偏移”
+            if (Math.abs(deltaX) > 3) {
+                if (!hasDragged) {
+                    hasDragged = true;
+                    timelineWrapper.style.cursor = 'ew-resize'; // 改变鼠标样式
+                    if (isPlaying) pausePlayback(); // 拖拽时先暂停播放
+                }
+            }
+
+            if (hasDragged) {
+                // 计算像素移动对应的时间偏移量
+                const deltaMs = (deltaX / pxPerSec) * 1000;
+                const newDelay = Math.round(initialDelay + deltaMs);
+
+                // 实时动态更新输入框的值
+                delayInput.value = newDelay;
+
+                // 实时更新谱面数据并重绘音符（不重绘波形，保持丝滑）
+                if (rawDrumData.length > 0) {
+                    preprocessData(rawDrumData);
+                    drawNotes();
+                }
+            }
+        };
+
+        // --- 定义拖拽结束的松开事件 ---
+        const handleMouseUp = (upEvent) => {
+            // 1. 清理临时绑定的全局事件
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            timelineWrapper.style.cursor = 'crosshair'; // 还原鼠标样式
+
+            if (!hasDragged) {
+                // === 没有触发拖拽：执行原本的点击跳转播放进度逻辑 ===
+                const currentPx = (currentOffsetMs / 1000) * pxPerSec;
+                let targetPx = clickX - playheadOffsetPx + currentPx;
+
+                targetPx = Math.max(0, Math.min(targetPx, trackWidth));
+                const seekMs = (targetPx / pxPerSec) * 1000;
+
+                // 显示点击毫秒
+                clickTimeLabel.style.left = clickX + "px";
+                clickTimeLabel.innerText = Math.round(seekMs) + " ms";
+
+                if (isPlaying) pausePlayback();
+
+                currentOffsetMs = seekMs;
+                progressBar.value = seekMs / 1000;
+                currentTimeDisplay.textContent = (seekMs / 1000).toFixed(1) + 's';
+
+                updateDynamicDisplay(seekMs);
+                updateScrollUI(seekMs);
+
+                if (wasPlaying) startPlayback();
+            } else {
+                // === 触发了拖拽：执行拖拽结束后的数据刷新逻辑 ===
+                if (rawDrumData.length > 0) {
+                    updateMaxDuration();
+                    calculateTimelineDimensions(); // 重新计算总长度并重绘
+                    updateScrollUI(currentOffsetMs); // 修正视图偏移
+                }
+
+                // 如果拖拽前在播放，松手后无缝恢复
+                if (wasPlaying) startPlayback();
+            }
+        };
+
+        // 在按下鼠标时，将移动和抬起事件绑定到 window 上
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    });
+
+    document.getElementById('playBtn').onclick = startPlayback;
+    document.getElementById('pauseBtn').onclick = pausePlayback;
+    document.getElementById('stopBtn').onclick = stopPlayback;
+</script>
+</body>
+</html>
+
+
+
