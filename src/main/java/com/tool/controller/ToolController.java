@@ -10,18 +10,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.ArrayList;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.tool.util.MusicXmlConverter.*;
@@ -418,5 +414,8 @@ public class ToolController {
         uploadService.generateContractsTemp(userName, personName, type, receiverNo);
         return Result.success();
     }
-
+        @PostMapping("/compress")
+    public Result compressDrumFiles() {
+        return uploadService.compressDrumFiles();
+    }
 }

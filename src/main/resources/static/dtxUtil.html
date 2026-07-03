@@ -489,7 +489,7 @@
                 params.append('songDuration', songDuration);
                 params.append('BPM', BPM);
 
-                fetch(`http://localhost:9001/tool/genHammerModel?${params.toString()}`, {method: 'POST'})
+                fetch(`http://localhost:9001/tool/genHammerModelHand?${params.toString()}`, {method: 'POST'})
                     .then(res => res.json())
                     .then(() => {
                         progressBar.style.width = '100%';

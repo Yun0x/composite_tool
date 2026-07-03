@@ -25,6 +25,7 @@ import javax.xml.parsers.DocumentBuilder;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.tool.util.DrumUtil.*;
 import static com.tool.util.DtxUtils.*;
@@ -718,6 +720,294 @@ public class UploadService {
         generateContract(type == 1 ? "57" : "58", userName, personName, receiverNo);
     }
 
+    public Result compressDrumFiles() {
+        String SOURCE_DIR = "D:\\Code\\python\\autoCopy\\dist\\drumFiles";
+        String TARGET_DIR = "D:\\Downloads\\压缩";
+        String FFMPEG_DIR = "D:\\Code\\ffmpeg\\bin";
+        long TARGET_MP3_MAX_BYTES = 1024L * 1000L;
+        Map<String, Object> data = new LinkedHashMap<String, Object>();
+        int binCopyCount = 0;
+        int mp3ProcessCount = 0;
+        List<String> failMessages = new ArrayList<String>();
+        data.put("sourceDir", SOURCE_DIR);
+        data.put("targetDir", TARGET_DIR);
+        try {
+            Path sourcePath = Paths.get(SOURCE_DIR);
+            Path targetPath = Paths.get(TARGET_DIR);
+            if (!Files.exists(sourcePath) || !Files.isDirectory(sourcePath)) {
+                data.put("binCopyCount", binCopyCount);
+                data.put("mp3ProcessCount", mp3ProcessCount);
+                data.put("failCount", failMessages.size());
+                data.put("failMessages", failMessages);
+                return Result.error(500, "源目录不存在：" + SOURCE_DIR, data);
+            }
+
+            Files.createDirectories(targetPath);
+
+            String ffmpegPath = FFMPEG_DIR + File.separator + "ffmpeg.exe";
+            String ffprobePath = FFMPEG_DIR + File.separator + "ffprobe.exe";
+
+            if (!new File(ffmpegPath).exists()) {
+                data.put("binCopyCount", binCopyCount);
+                data.put("mp3ProcessCount", mp3ProcessCount);
+                data.put("failCount", failMessages.size());
+                data.put("failMessages", failMessages);
+                return Result.error(500, "ffmpeg.exe 不存在：" + ffmpegPath, data);
+            }
+
+            if (!new File(ffprobePath).exists()) {
+                data.put("binCopyCount", binCopyCount);
+                data.put("mp3ProcessCount", mp3ProcessCount);
+                data.put("failCount", failMessages.size());
+                data.put("failMessages", failMessages);
+                return Result.error(500, "ffprobe.exe 不存在：" + ffprobePath, data);
+            }
+
+            try (Stream<Path> stream = Files.walk(sourcePath)) {
+                Iterator<Path> iterator = stream
+                        .filter(Files::isRegularFile)
+                        .iterator();
+
+                while (iterator.hasNext()) {
+                    Path file = iterator.next();
+
+                    String fileName = file.getFileName().toString();
+                    String lowerName = fileName.toLowerCase(Locale.ROOT);
+
+                    try {
+                        if (lowerName.endsWith(".bin")) {
+                            Path targetFile = getNoConflictPath(targetPath.resolve(fileName));
+                            Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                            binCopyCount++;
+                        } else if (lowerName.endsWith(".mp3")) {
+                            Path targetFile = getNoConflictPath(targetPath.resolve(fileName));
+
+                            compressMp3ToUnderSize(
+                                    file,
+                                    targetFile,
+                                    ffmpegPath,
+                                    ffprobePath,
+                                    TARGET_MP3_MAX_BYTES
+                            );
+
+                            mp3ProcessCount++;
+                        }
+                    } catch (Exception e) {
+                        failMessages.add("处理失败：" + file.toAbsolutePath() + "，原因：" + e.getMessage());
+                    }
+                }
+            }
+
+            data.put("binCopyCount", binCopyCount);
+            data.put("mp3ProcessCount", mp3ProcessCount);
+            data.put("failCount", failMessages.size());
+            data.put("failMessages", failMessages);
+
+            if (!failMessages.isEmpty()) {
+                return Result.success("处理完成，但有部分文件失败", data);
+            }
+
+            return Result.success("处理完成", data);
+        } catch (Exception e) {
+            data.put("binCopyCount", binCopyCount);
+            data.put("mp3ProcessCount", mp3ProcessCount);
+            data.put("failCount", failMessages.size());
+            data.put("failMessages", failMessages);
+
+            return Result.error(500, "处理失败：" + e.getMessage(), data);
+        }
+    }
+
+    private void compressMp3ToUnderSize(
+            Path inputFile,
+            Path outputFile,
+            String ffmpegPath,
+            String ffprobePath,
+            long targetMaxBytes
+    ) throws Exception {
+
+        long inputSize = Files.size(inputFile);
+
+        // 如果本来就小于 1MB，直接复制
+        if (inputSize < targetMaxBytes) {
+            Files.copy(inputFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
+            return;
+        }
+
+        double durationSeconds = getMp3DurationSeconds(inputFile, ffprobePath);
+
+        List<Integer> bitrateList = buildBitrateList(durationSeconds, targetMaxBytes);
+
+        Exception lastException = null;
+
+        for (Integer bitrate : bitrateList) {
+            Path tempFile = outputFile.getParent().resolve(
+                    removeExt(outputFile.getFileName().toString()) + "_tmp_" + bitrate + "k.mp3"
+            );
+
+            Files.deleteIfExists(tempFile);
+
+            List<String> command = Arrays.asList(
+                    ffmpegPath,
+                    "-y",
+                    "-i", inputFile.toAbsolutePath().toString(),
+                    "-vn",
+                    "-ac", "1",
+                    "-ar", bitrate <= 16 ? "22050" : "44100",
+                    "-codec:a", "libmp3lame",
+                    "-b:a", bitrate + "k",
+                    tempFile.toAbsolutePath().toString()
+            );
+
+            try {
+                runCommand(command);
+
+                if (Files.exists(tempFile) && Files.size(tempFile) < targetMaxBytes) {
+                    Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
+                    return;
+                }
+
+                Files.deleteIfExists(tempFile);
+            } catch (Exception e) {
+                lastException = e;
+                Files.deleteIfExists(tempFile);
+            }
+        }
+
+        if (lastException != null) {
+            throw lastException;
+        }
+
+        throw new RuntimeException("无法压缩到 1MB 以下，可能音频时长过长：" + inputFile.toAbsolutePath());
+    }
+
+    private double getMp3DurationSeconds(Path inputFile, String ffprobePath) {
+        try {
+            List<String> command = Arrays.asList(
+                    ffprobePath,
+                    "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    inputFile.toAbsolutePath().toString()
+            );
+
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(true);
+
+            Process process = pb.start();
+
+            String line;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), Charset.defaultCharset())
+            )) {
+                line = reader.readLine();
+            }
+
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0 && line != null && line.trim().length() > 0) {
+                return Double.parseDouble(line.trim());
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 获取时长失败时，给一个默认值，避免方法直接失败
+        return 60D;
+    }
+
+    private List<Integer> buildBitrateList(double durationSeconds, long targetMaxBytes) {
+        List<Integer> list = new ArrayList<Integer>();
+
+        if (durationSeconds <= 0) {
+            durationSeconds = 60D;
+        }
+
+        // 预留一点空间，避免刚好超过 1MB
+        long safeBytes = (long) (targetMaxBytes * 0.88D);
+
+        int calcBitrate = (int) Math.floor((safeBytes * 8D / durationSeconds) / 1000D);
+
+        if (calcBitrate > 128) {
+            calcBitrate = 128;
+        }
+
+        if (calcBitrate < 8) {
+            calcBitrate = 8;
+        }
+
+        list.add(calcBitrate);
+
+        int[] commonBitrates = new int[]{128, 112, 96, 80, 64, 56, 48, 40, 32, 24, 16, 12, 8};
+
+        for (int bitrate : commonBitrates) {
+            if (!list.contains(bitrate) && bitrate <= calcBitrate) {
+                list.add(bitrate);
+            }
+        }
+
+        return list;
+    }
+
+    private void runCommand(List<String> command) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.redirectErrorStream(true);
+
+        Process process = pb.start();
+
+        StringBuilder output = new StringBuilder();
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), Charset.defaultCharset())
+        )) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append(System.lineSeparator());
+            }
+        }
+
+        int exitCode = process.waitFor();
+
+        if (exitCode != 0) {
+            throw new RuntimeException("命令执行失败，exitCode=" + exitCode + "\n" + output);
+        }
+    }
+
+    private Path getNoConflictPath(Path path) {
+        if (!Files.exists(path)) {
+            return path;
+        }
+
+        String fileName = path.getFileName().toString();
+        String name = removeExt(fileName);
+        String ext = getExt(fileName);
+
+        Path parent = path.getParent();
+
+        int index = 1;
+        while (true) {
+            Path newPath = parent.resolve(name + "_" + index + ext);
+            if (!Files.exists(newPath)) {
+                return newPath;
+            }
+            index++;
+        }
+    }
+
+    private String removeExt(String fileName) {
+        int index = fileName.lastIndexOf(".");
+        if (index <= 0) {
+            return fileName;
+        }
+        return fileName.substring(0, index);
+    }
+
+    private String getExt(String fileName) {
+        int index = fileName.lastIndexOf(".");
+        if (index <= 0) {
+            return "";
+        }
+        return fileName.substring(index);
+    }
 
     private static class RawDrumEvent {
         Integer key;
