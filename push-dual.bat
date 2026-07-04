@@ -12,7 +12,8 @@ REM ============================================================
 
 REM ===================== 你只需要改这里 =====================
 
-set "https://gitee.com/yunox/uploadTool.git"
+set "GITEE_URL=https://gitee.com/yunox/auto_like.git"
+set "GITHUB_URL=git@github.com:Yun0x/auto_like.git"
 
 REM 远程仓库名称，一般不用改
 set "GITEE_REMOTE=gitee"
@@ -259,6 +260,11 @@ echo ==============================
 echo [8/8] 推送到 GitHub
 echo ==============================
 
+git push -u %GITHUB_REMOTE% %CURRENT_BRANCH%
+set "GITHUB_RESULT=%ERRORLEVEL%"
+
+if "%PUSH_TAGS%"=="1" (
+git push %GITHUB_REMOTE% --tags
 )
 
 echo.
