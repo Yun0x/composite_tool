@@ -62,4 +62,17 @@ public class TestController {
         return result;
     }
 
+    @RequestMapping("/getFirstOrder")
+    public Result getFirstOrder(@RequestParam String machineNo) {
+        Map<String, Object> info = testService.getFirstOrder(machineNo);
+        return Result.success(info);
+    }
+
+    //生成20万用户 + 100万机器 + 1亿订单
+    @RequestMapping("/all")
+    public Map<String, Object> generateAll() {
+        return testService.generateAll();
+    }
+
+
 }

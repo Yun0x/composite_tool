@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+target/
+
+# logs
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# system
+.DS_Store
+Thumbs.db
+
+# runtime sensitive files
+runtime.core
+runtime.window
+runtime.state
+private_pkcs8.pem
+*.pem
+
+# env local
+.env.local
+.env.*.local

@@ -17,4 +17,292 @@
         select iccid
         from t_simcard_info limit 1000
     </select>
+    <select id="getMachineInfoByNo" resultType="com.tool.vo.testVO.TMachineCarInfo">
+        select *
+        from t_machine_car_info
+        where machine_no = #{machineNo} limit 1
+    </select>
+    <select id="getMinOrderId" resultType="java.lang.Integer">
+        SELECT
+            MIN(order_id)
+        FROM
+            t_order_car_info
+    </select>
+
+    <select id="getMaxOrderId" resultType="java.lang.Integer">
+        SELECT
+            MAX(order_id)
+        FROM
+            t_order_car_info
+    </select>
+    <select id="checkMachineOrderExist" resultType="java.lang.Integer">
+        SELECT
+            1
+        FROM
+            t_order_car_info
+        WHERE
+            order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+            LIMIT 1
+    </select>
+    <select id="getFirstOrderByMachineNoInRange" resultType="com.tool.vo.testVO.TOrderCarInfo">
+        SELECT
+            *
+        FROM
+            t_order_car_info
+        WHERE
+            order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo} and order_status = 1
+        ORDER BY
+            order_id ASC
+            LIMIT 1
+    </select>
+    <select id="getUserInfo" resultType="com.tool.vo.testVO.TUser">
+        select * from t_user where user_num = #{userNum} or user_num = #{agentUserNum} or user_num = #{parentUserNum}
+    </select>
+    <insert id="batchInsertUsers">
+        INSERT INTO t_user
+        (
+        user_num,
+        parent_num,
+        member_num,
+        login_name,
+        user_name,
+        login_pass,
+        pay_pass,
+        org_name,
+        org_id,
+        user_sex,
+        link_tel,
+        user_type,
+        address,
+        create_code,
+        create_date,
+        user_status,
+        bind_status,
+        balance,
+        money_limit,
+        service_fee,
+        is_auto_card,
+        is_configure,
+        is_sms,
+        is_refund,
+        parent_proportion,
+        proportion,
+        dev_type,
+        ppc_proportion,
+        parent_ppc_proportion,
+        province_code,
+        city_code,
+        area_code,
+        verify_phone,
+        allow_withdraw
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.userNum},
+            #{item.parentNum},
+            #{item.memberNum},
+            #{item.loginName},
+            #{item.userName},
+            #{item.loginPass},
+            #{item.payPass},
+            #{item.orgName},
+            #{item.orgId},
+            #{item.userSex},
+            #{item.linkTel},
+            #{item.userType},
+            #{item.address},
+            #{item.createCode},
+            #{item.createDate},
+            #{item.userStatus},
+            #{item.bindStatus},
+            #{item.balance},
+            #{item.moneyLimit},
+            #{item.serviceFee},
+            #{item.isAutoCard},
+            #{item.isConfigure},
+            #{item.isSms},
+            #{item.isRefund},
+            #{item.parentProportion},
+            #{item.proportion},
+            #{item.devType},
+            #{item.ppcProportion},
+            #{item.parentPpcProportion},
+            #{item.provinceCode},
+            #{item.cityCode},
+            #{item.areaCode},
+            #{item.verifyPhone},
+            #{item.allowWithdraw}
+            )
+        </foreach>
+    </insert>
+
+    <insert id="batchInsertMachines">
+        INSERT INTO t_machine_car_info
+        (
+        machine_num,
+        machine_no,
+        machine_status,
+        chip_id,
+        machine_type,
+        hardware_type,
+        signal_value,
+        location,
+        imsi,
+        machine_label,
+        remark,
+        create_time,
+        update_time,
+        child_user_nums,
+        user_num,
+        agent_user_num,
+        parent_user_num,
+        qrcode_url,
+        new_group_num,
+        poweron_or_not,
+        sale_or_not,
+        rom_damage,
+        power_level,
+        soft_version,
+        water_level,
+        flag1,
+        flag2,
+        flag3,
+        site,
+        pao_pao_json,
+        goods_nums,
+        fence_num,
+        is_fence_configured,
+        is_in_fence,
+        fence_config_time,
+        deposit_config
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.machineNum},
+            #{item.machineNo},
+            #{item.machineStatus},
+            #{item.chipId},
+            #{item.machineType},
+            #{item.hardwareType},
+            #{item.signalValue},
+            #{item.location},
+            #{item.imsi},
+            #{item.machineLabel},
+            #{item.remark},
+            #{item.createTime},
+            #{item.updateTime},
+            #{item.childUserNums},
+            #{item.userNum},
+            #{item.agentUserNum},
+            #{item.parentUserNum},
+            #{item.qrcodeUrl},
+            #{item.newGroupNum},
+            #{item.poweronOrNot},
+            #{item.saleOrNot},
+            #{item.romDamage},
+            #{item.powerLevel},
+            #{item.softVersion},
+            #{item.waterLevel},
+            #{item.flag1},
+            #{item.flag2},
+            #{item.flag3},
+            #{item.site},
+            #{item.paoPaoJson},
+            #{item.goodsNums},
+            #{item.fenceNum},
+            #{item.isFenceConfigured},
+            #{item.isInFence},
+            #{item.fenceConfigTime},
+            #{item.depositConfig}
+            )
+        </foreach>
+    </insert>
+
+    <insert id="batchInsertOrders">
+        INSERT INTO t_order_car_info
+        (
+        order_num,
+        transaction_no,
+        open_id,
+        refund_no,
+        account_num,
+        trad_create_time,
+        trad_success_time,
+        trad_fail_time,
+        trad_cancel_time,
+        shipment_status,
+        order_status,
+        settlement_status,
+        buyer_account,
+        pay_method,
+        machine_no,
+        parent_user_num,
+        agent_user_num,
+        goods_name,
+        channel_id,
+        total_count,
+        total_price,
+        user_num,
+        error_info,
+        falg1,
+        flag2,
+        flag3,
+        account_type,
+        goods_num,
+        goods_remark,
+        trade_no,
+        is_machine_returned,
+        return_price,
+        total_time,
+        deposit_config,
+        site,
+        child_user_nums
+        )
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.orderNum},
+            #{item.transactionNo},
+            #{item.openId},
+            #{item.refundNo},
+            #{item.accountNum},
+            #{item.tradCreateTime},
+            #{item.tradSuccessTime},
+            #{item.tradFailTime},
+            #{item.tradCancelTime},
+            #{item.shipmentStatus},
+            #{item.orderStatus},
+            #{item.settlementStatus},
+            #{item.buyerAccount},
+            #{item.payMethod},
+            #{item.machineNo},
+            #{item.parentUserNum},
+            #{item.agentUserNum},
+            #{item.goodsName},
+            #{item.channelId},
+            #{item.totalCount},
+            #{item.totalPrice},
+            #{item.userNum},
+            #{item.errorInfo},
+            #{item.falg1},
+            #{item.flag2},
+            #{item.flag3},
+            #{item.accountType},
+            #{item.goodsNum},
+            #{item.goodsRemark},
+            #{item.tradeNo},
+            #{item.isMachineReturned},
+            #{item.returnPrice},
+            #{item.totalTime},
+            #{item.depositConfig},
+            #{item.site},
+            #{item.childUserNums}
+            )
+        </foreach>
+    </insert>
+
 </mapper>
