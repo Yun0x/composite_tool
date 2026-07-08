@@ -1,16 +1,23 @@
 package com.tool.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tool.config.datasource.DataSourceContextHolder;
+import com.tool.config.datasource.DynamicDataSourceProperties;
 import com.tool.mapper.TestMapper;
 import com.tool.mapper.UploadMapper;
+import com.tool.util.EmptyUtils;
 import com.tool.util.Result;
 import com.tool.util.SDCareVerifyUtil;
 import com.tool.util.YiYuanSimUtiles;
 import com.tool.vo.TSimcardInfo;
+import com.tool.vo.testVO.TCheckInfo;
 import com.tool.vo.testVO.TMachineCarInfo;
 import com.tool.vo.testVO.TOrderCarInfo;
 import com.tool.vo.testVO.TUser;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -20,6 +27,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.text.SimpleDateFormat;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,8 +42,24 @@ import java.util.stream.Stream;
 @Service
 public class TestService {
 
+    private static final BigInteger DB0_MIN = new BigInteger("13000001");//shouhuoji
+    private static final BigInteger DB0_MAX = new BigInteger("13100000");
+    private static final BigInteger DB1_MIN = new BigInteger("13200001");//shouhuoji
+    private static final BigInteger DB1_MAX = new BigInteger("13300000");
+    private static final BigInteger DB2_MIN = new BigInteger("13500001");//cannon
+    private static final BigInteger DB2_MAX = new BigInteger("13550000");
+    private static final BigInteger DB3_MIN = new BigInteger("13600001");//drum
+    private static final BigInteger DB3_MAX = new BigInteger("13620000");
+    private static final BigInteger DB4_MIN = new BigInteger("13620001");//xiaoxiaole
+    private static final BigInteger DB4_MAX = new BigInteger("13640000");
+    private static final String DATE_FORMAT_PATTERN = "yyyy年MM月dd日 HH时mm分ss秒";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Map<String, String> CHECK_ITEM_LABELS = buildCheckItemLabels();
     @Resource
     private TestMapper testMapper;
+
+    @Resource
+    private DynamicDataSourceProperties dynamicDataSourceProperties;
 
     public List<String> getAllIccid() {
         return testMapper.getAllIccid();
@@ -292,12 +317,406 @@ public class TestService {
         }
     }
 
+    //通过这个machienNo找到key来决定用哪个数据库
+    private String getSqlBaseSourceKey(String machineNo) {
+        String defaultKey = dynamicDataSourceProperties.getDefaultKey();
+        BigInteger machineNumber = getMachineNo(machineNo);
+        if (machineNumber == null) {
+            return defaultKey;
+        }
+        String dataSourceKey = null;
+        if (checkInRange(machineNumber, DB0_MIN, DB0_MAX)) {
+            dataSourceKey = "db0";
+        } else if (checkInRange(machineNumber, DB1_MIN, DB1_MAX)) {
+            dataSourceKey = "db1";
+        } else if (checkInRange(machineNumber, DB2_MIN, DB2_MAX)) {
+            dataSourceKey = "db2";
+        } else if (checkInRange(machineNumber, DB3_MIN, DB3_MAX)) {
+            dataSourceKey = "db3";
+        } else if (checkInRange(machineNumber, DB4_MIN, DB4_MAX)) {
+            dataSourceKey = "db4";
+        }
+
+        if (!StringUtils.hasText(dataSourceKey)) {
+            return defaultKey;
+        }
+        if (dynamicDataSourceProperties.getSources() == null
+                || !dynamicDataSourceProperties.getSources().containsKey(dataSourceKey)) {
+            return defaultKey;
+        }
+        return dataSourceKey;
+    }
+
+    private BigInteger getMachineNo(String machineNo) {
+        if (!StringUtils.hasText(machineNo)) {
+            return null;
+        }
+        String digits = machineNo.trim().replaceAll("\\D", "");
+        if (!StringUtils.hasText(digits)) {
+            return null;
+        }
+        return new BigInteger(digits);
+    }
+
+    private boolean checkInRange(BigInteger value, BigInteger min, BigInteger max) {
+        return value.compareTo(min) >= 0 && value.compareTo(max) <= 0;
+    }
 
     public Map<String, Object> getFirstOrder(String machineNo) {
+        String dataSourceKey = getSqlBaseSourceKey(machineNo);
+        DataSourceContextHolder.set(dataSourceKey);
+
+        try {
+            Map<String, Object> result = new LinkedHashMap<String, Object>();
+            // 查询机器信息
+            TMachineCarInfo machine;
+            if (dataSourceKey.equals("db0")) {
+                machine = testMapper.getMachineInfoByNoOnAlcohol(machineNo);
+            } else if (dataSourceKey.equals("db3")) {
+                machine = testMapper.getMachineInfoByNoOnDrum(machineNo);
+            } else {
+                machine = testMapper.getMachineInfoByNo(machineNo);
+            }
+            if (machine == null) {
+                result.put("code", 404);
+                result.put("msg", "机器不存在");
+                return result;
+            }
+            // 查询订单表最小和最大订单ID
+            Integer minOrderId;
+            Integer maxOrderId;
+            if (dataSourceKey.equals("db0")) {
+                minOrderId = testMapper.getMinOrderIdOnAlcohol();
+                maxOrderId = testMapper.getMaxOrderIdOnAlcohol();
+            } else if (dataSourceKey.equals("db3")) {
+                minOrderId = testMapper.getMinOrderIdOnDrum();
+                maxOrderId = testMapper.getMaxOrderIdOnDrum();
+            } else {
+                minOrderId = testMapper.getMinOrderId();
+                maxOrderId = testMapper.getMaxOrderId();
+            }
+//            if (minOrderId == null || maxOrderId == null) {
+//                result.put("code", 404);
+//                result.put("msg", "订单表没数据");
+//                return result;
+//            }
+            Integer startOrderId = minOrderId;
+            // 如果机器创建时间不为空 根据机器创建时间做一次时间二分
+            if (machine.getCreateTime() != null) {
+                Date machineCreateTime = machine.getCreateTime();
+                Integer timeLeft = minOrderId;
+                Integer timeRight = maxOrderId;
+                // 找到第一个订单时间大于等于机器创建时间的订单id
+                while (timeLeft < timeRight) {
+                    Integer mid = timeLeft + (timeRight - timeLeft) / 2;
+                    Date orderCreateTime;
+                    if (dataSourceKey.equals("db0")) {
+                        orderCreateTime = testMapper.getOrderTimeOnAlcohol(mid);
+                    } else if (dataSourceKey.equals("db3")) {
+                        orderCreateTime = testMapper.getOrderTimeOnDrum(mid);
+                    } else {
+                        orderCreateTime = testMapper.getOrderTime(mid);
+                    }
+                    // 如果这个订单的id查不到时间，就往右，就是时间继续往后找订单
+                    if (orderCreateTime == null) {
+                        timeLeft = mid + 1;
+                        continue;
+                    }
+                    // 如果中间订单时间早于机器创建时间，说明左边都太早，继续往右找
+                    if (orderCreateTime.before(machineCreateTime)) {
+                        timeLeft = mid + 1;
+                        if ((timeRight - timeLeft) <= 100000) {
+                            break;
+                        }
+                    } else {
+                        // 如果中间订单时间大于等于机器创建时间，说明当前点可能是边界，继续往左压
+                        timeRight = mid;
+                    }
+                }
+                // 二分以后的开始订单id
+                startOrderId = timeLeft;
+            }
+            // 如果机器创建时间为空，就直接用原先逻辑
+            Integer totalExist;
+            if (dataSourceKey.equals("db0")) {
+                totalExist = testMapper.checkMachineOrderExistInAlcohol(machineNo, startOrderId, maxOrderId);
+            } else if (dataSourceKey.equals("db3")) {
+                totalExist = testMapper.checkMachineOrderExistInDrum(machineNo, startOrderId, maxOrderId);
+            } else {
+                totalExist = testMapper.checkMachineOrderExist(machineNo, startOrderId, maxOrderId);
+            }
+            // 该机器有订单
+            List<TOrderCarInfo> orderList = new ArrayList<>();
+            Map<String, TUser> userMap = new HashMap<>();
+            if (EmptyUtils.isNotEmpty(totalExist) && totalExist > 0) {
+                Integer left = startOrderId;
+                Integer right = maxOrderId;
+                // 最大范围限制为100万
+                final Integer MAX_RANGE = 1000000;
+                while (right - left > MAX_RANGE) {
+                    Integer mid = left + (right - left) / 2;
+                    // 判断左半区间有没有该机器订单
+                    Integer existInLeft;
+                    if (dataSourceKey.equals("db0")) {
+                        existInLeft = testMapper.checkMachineOrderExistInAlcohol(machineNo, left, mid);
+                    } else if (dataSourceKey.equals("db3")) {
+                        existInLeft = testMapper.checkMachineOrderExistInDrum(machineNo, left, mid);
+                    } else {
+                        existInLeft = testMapper.checkMachineOrderExist(machineNo, left, mid);
+                    }
+                    // 左半区间有订单，说明首单一定在左边
+                    if (existInLeft != null && existInLeft > 0) {
+                        right = mid;
+                    } else {
+                        // 左半区间没有订单，说明首单只能在右边
+                        left = mid + 1;
+                    }
+                }
+
+                // 在最终缩小后的范围内查询该机器第一笔订单
+                if (dataSourceKey.equals("db0")) {
+                    orderList = testMapper.getFirstOrderByMachineNoInAlcRange(machineNo, left, right);
+                } else if (dataSourceKey.equals("db3")) {
+                    orderList = testMapper.getFirstOrderByMachineNoInDrumRange(machineNo, left, right);
+                } else {
+                    orderList = testMapper.getFirstOrderByMachineNoInRange(machineNo, left, right);
+                }
+                TOrderCarInfo firstOrder = orderList.get(0);
+                List<TUser> userList = testMapper.getUserInfo(
+                        firstOrder.getUserNum(),
+                        firstOrder.getAgentUserNum(),
+                        firstOrder.getParentUserNum()
+                );
+                userMap = buildUserMap(userList);
+                result.put("首笔订单信息", buildOrderInfo(firstOrder, userMap));
+
+                for (TOrderCarInfo order : orderList) {
+                    if (order != null) {
+                        mergeUserMap(userMap, testMapper.getUserInfo(
+                                order.getUserNum(),
+                                order.getAgentUserNum(),
+                                order.getParentUserNum()
+                        ));
+                    }
+                }
+                result.put("前十条订单信息", buildOrderInfoList(orderList, userMap));
+            }
+            List<TUser> userList = testMapper.getUserInfo(
+                    machine.getUserNum(),
+                    machine.getAgentUserNum(),
+                    machine.getParentUserNum());
+            userMap = buildUserMap(userList);
+
+            TCheckInfo tCheckInfo = null;
+            if (!dataSourceKey.equals("db1") && !dataSourceKey.equals("db0")) {
+                tCheckInfo = testMapper.getGetCheckInfoByMachine(machineNo);
+            }
+            result.put("code", 200);
+            result.put("设备信息", buildMachineInfo(machine, userMap));
+            result.put("出厂质检信息", buildCheckInfo(tCheckInfo));
+            return result;
+        } finally {
+            DataSourceContextHolder.clear();
+        }
+    }
+
+    private Map<String, TUser> buildUserMap(List<TUser> userList) {
+        Map<String, TUser> userMap = new HashMap<String, TUser>();
+        mergeUserMap(userMap, userList);
+        return userMap;
+    }
+
+    private void mergeUserMap(Map<String, TUser> userMap, List<TUser> userList) {
+        if (userList == null) {
+            return;
+        }
+        for (TUser user : userList) {
+            if (user != null && user.getUserNum() != null) {
+                userMap.put(user.getUserNum(), user);
+            }
+        }
+    }
+
+    private Map<String, Object> buildMachineInfo(TMachineCarInfo machine, Map<String, TUser> userMap) {
+        Map<String, Object> info = new LinkedHashMap<String, Object>();
+        info.put("设备编号", machine.getMachineNo());
+        info.put("品牌方登录名", getLoginName(userMap, machine.getParentUserNum()));
+        info.put("合伙人登录名", getLoginName(userMap, machine.getAgentUserNum()));
+        info.put("代理商登录名", getLoginName(userMap, machine.getUserNum()));
+        info.put("场地", machine.getSite());
+        info.put("到期时间", formatDate(machine.getExTime()));
+        info.put("创建时间", formatDate(machine.getCreateTime()));
+        return info;
+    }
+
+    private Map<String, Object> buildCheckInfo(TCheckInfo checkInfo) {
+        Map<String, Object> info = new LinkedHashMap<String, Object>();
+        info.put("质检人登录名", checkInfo == null ? null : checkInfo.getLoginName());
+        info.put("质检结果", checkInfo == null ? null : parseCheckResult(checkInfo.getCheckResultJson()));
+        info.put("质检时间", checkInfo == null ? null : formatDate(checkInfo.getCheckTime()));
+        return info;
+    }
+
+    private List<Map<String, Object>> parseCheckResult(String checkResultJson) {
+        List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+        if (!StringUtils.hasText(checkResultJson)) {
+            return result;
+        }
+        try {
+            Map<String, Object> checkResult = OBJECT_MAPPER.readValue(
+                    checkResultJson,
+                    new TypeReference<LinkedHashMap<String, Object>>() {
+                    }
+            );
+            for (Map.Entry<String, Object> entry : checkResult.entrySet()) {
+                Map<String, Object> item = new LinkedHashMap<String, Object>();
+                item.put("检查项", getCheckItemLabel(entry.getKey()));
+                item.put("结果", convertCheckResultValue(entry.getValue()));
+                result.add(item);
+            }
+        } catch (Exception ex) {
+            Map<String, Object> item = new LinkedHashMap<String, Object>();
+            item.put("检查项", "原始质检结果");
+            item.put("结果", checkResultJson);
+            result.add(item);
+        }
+        return result;
+    }
+
+    private String getCheckItemLabel(String key) {
+        String label = CHECK_ITEM_LABELS.get(key);
+        return StringUtils.hasText(label) ? label : key;
+    }
+
+    private String convertCheckResultValue(Object value) {
+        Integer intValue = parseInteger(value);
+        if (intValue != null) {
+            if (intValue == 1) {
+                return "是";
+            }
+            if (intValue == 0 || intValue == 2) {
+                return "否";
+            }
+        }
+        if (value instanceof Boolean) {
+            return ((Boolean) value) ? "是" : "否";
+        }
+        return value == null ? "-" : String.valueOf(value);
+    }
+
+    private Integer parseInteger(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        if (value instanceof String && StringUtils.hasText((String) value)) {
+            try {
+                return Integer.valueOf(((String) value).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, String> buildCheckItemLabels() {
+        Map<String, String> labels = new LinkedHashMap<String, String>();
+        labels.put("barrelPosition", "检查炮筒球头高低位置");
+        labels.put("boardTerminals", "检查主板供电端子和加热端子线束是否拧紧，线束是否扎到立柱上");
+        labels.put("qrCode", "扫码时二维码安装方向是否正确，螺丝是否打到位");
+        labels.put("signal", "检查信号值");
+        labels.put("floatingBall", "检查浮球信号");
+        labels.put("pumpSensorLeakage", "检查电磁泵和传感器前后端是否进气、漏油");
+        labels.put("bindingInBox", "检查机箱内线束和配件是否按要求绑扎");
+        labels.put("screwInside", "检查机箱内螺丝是否打到位，是否按要求使用指定尺寸垫片和弹垫");
+        labels.put("screwOutSide", "检查炮筒尾板螺丝、前挡板螺丝、脚踏螺丝是否打好");
+        labels.put("stickersAndStrips", "检查贴纸和胶条是否有破损，是否漏贴漏装");
+        labels.put("burrsAndPaint", "检查是否有毛刺，外观掉漆");
+        labels.put("heatingWire", "检查炮筒内发热丝前端是否漏油，后端出油是否顺畅");
+        labels.put("wireInBarrel", "检查炮筒内线束是否按要求扎好，帆布是否碰到线束");
+        labels.put("lamp", "检查彩灯是否亮");
+        labels.put("music", "检查背景音乐、语音播报和蓄力音效");
+        labels.put("barrelLeakage", "检查炮筒下方和后方是否漏烟");
+        labels.put("barrelLine", "检查炮筒抬头时下方管道是否受到拉扯");
+        labels.put("smoke", "检查制烟和烟圈效果");
+        labels.put("button", "检查按钮、脚踏功能是否正常");
+        labels.put("abnormalSound", "检查有无异响");
+        labels.put("backOil", "检查停止运行后进油管是否回油");
+        labels.put("key", "钥匙是否挂好");
+        labels.put("songAudio", "歌曲音频音量是否够大且无破音");
+        labels.put("drumAudio", "鼓声音频音量是否够大且无破音");
+        labels.put("lights", "各路灯光是否正常");
+        labels.put("hitSignal", "各路打击信号是否正常");
+        labels.put("networkSignal", "网络信号值是否正常");
+        labels.put("channelValue", "通道值是否正常");
+        labels.put("sdCardStatus", "SD卡状态是否正常");
+        labels.put("songCount", "歌曲数量是否正常");
+        labels.put("qrCodeInstalled", "二维码牌是否正确安装");
+        labels.put("drumStickInstalled", "鼓棒是否正确安装");
+        labels.put("sealantStatus", "密封胶是否涂抹完好");
+        labels.put("appearance", "外观是否正常，未漏漆，未变形");
+        labels.put("isResetVolume", "音量是否恢复默认值");
+        labels.put("bubbleStatus", "吐泡功能是否正常");
+        labels.put("backgroundMusic", "背景音乐是否正常");
+        labels.put("gameEffectAudio", "游戏音效是否正常");
+        labels.put("rotatingLight", "前置旋转灯是否正常");
+        labels.put("waterFlowLight", "前置引流水灯是否正常");
+        labels.put("touchPanelLight", "触摸板灯光是否正常");
+        labels.put("touchSensitivity", "触摸板触摸是否灵敏");
+        labels.put("liquidLevel", "液位是否正常");
+        labels.put("qrCodePlateInstalled", "二维码牌是否正确安装");
+        return labels;
+    }
+
+    private Map<String, Object> buildOrderInfo(TOrderCarInfo order, Map<String, TUser> userMap) {
+        Map<String, Object> info = new LinkedHashMap<String, Object>();
+        info.put("订单编号", order.getOrderNum());
+        info.put("订单品牌方登录名", getLoginName(userMap, order.getParentUserNum()));
+        info.put("合伙人登录名", getLoginName(userMap, order.getAgentUserNum()));
+        info.put("代理商登录名", getLoginName(userMap, order.getUserNum()));
+        info.put("金额", order.getTotalPrice()+"元");
+        info.put("订单时间", formatDate(order.getTradCreateTime()));
+        return info;
+    }
+
+    private List<Map<String, Object>> buildOrderInfoList(List<TOrderCarInfo> orderList, Map<String, TUser> userMap) {
+        List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+        if (orderList == null) {
+            return result;
+        }
+        for (TOrderCarInfo order : orderList) {
+            if (order != null) {
+                result.add(buildOrderInfo(order, userMap));
+            }
+        }
+        return result;
+    }
+
+    private String getLoginName(Map<String, TUser> userMap, String userNum) {
+        TUser user = userMap == null ? null : userMap.get(userNum);
+        if (user == null || !StringUtils.hasText(user.getLoginName())) {
+            return userNum;
+        }
+        return user.getLoginName();
+    }
+
+    private String formatDate(Date date) {
+        if (date == null) {
+            return null;
+        }
+        return new SimpleDateFormat(DATE_FORMAT_PATTERN).format(date);
+    }
+
+    public Map<String, Object> getFirstOrder2(String machineNo) {
         Map<String, Object> result = new LinkedHashMap<>();
         Integer minOrderId = testMapper.getMinOrderId();
         Integer maxOrderId = testMapper.getMaxOrderId();
         if (minOrderId == null || maxOrderId == null) {
+            return result;
+        }
+        Integer totalExist = testMapper.checkMachineOrderExist(machineNo, minOrderId, maxOrderId);
+        //拿来做一个订单都没有的特殊处理，直接返回404空
+        if (totalExist == null) {
+            result.put("code", 404);
             return result;
         }
         Integer left = minOrderId;
@@ -316,15 +735,20 @@ public class TestService {
                 left = mid + 1;
             }
         }
-        TOrderCarInfo firstOrder = testMapper.getFirstOrderByMachineNoInRange(machineNo, left, right);
+        List<TOrderCarInfo> orderList = testMapper.getFirstOrderByMachineNoInRange(machineNo, left, right);
+        if (orderList == null || orderList.isEmpty()) {
+            result.put("code", 404);
+            return result;
+        }
+        TOrderCarInfo firstOrder = orderList.get(0);
         //这时候订单找到了，firstOrder，然后用订单去找user的三级
-        List<TUser> userList = testMapper.getUserInfo(firstOrder.getUserNum(),firstOrder.getAgentUserNum(),firstOrder.getParentUserNum());
+        List<TUser> userList = testMapper.getUserInfo(firstOrder.getUserNum(), firstOrder.getAgentUserNum(), firstOrder.getParentUserNum());
+        result.put("code", 200);
         result.put("代理商信息", userList.get(0));
         result.put("合伙人信息", userList.get(1));
         result.put("品牌方信息", userList.get(2));
         result.put("第一次下单时间", firstOrder.getTradCreateTime());
-        result.put("订单信息", firstOrder);
-
+        result.put("订单信息", orderList);
         return result;
     }
 
@@ -349,33 +773,23 @@ public class TestService {
 
     public Map<String, Object> generateUsers(int total, int threadCount, int batchSize) {
         long startTime = System.currentTimeMillis();
-
         if (total != 200000) {
-            throw new IllegalArgumentException("当前规则固定生成20万用户，total请传200000");
+            throw new IllegalArgumentException("当前规则固定生成20万用户，传200000");
         }
-
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         List<Future<Long>> futures = new ArrayList<Future<Long>>();
-
         // 1. 生成4级用户
         futures.addAll(submitUserTasks(executor, 1, AGENT_USER_COUNT, 4, threadCount, batchSize));
-
         waitFutures(futures);
         futures.clear();
-
         // 2. 生成2级用户
         futures.addAll(submitUserTasks(executor, 1, MERCHANT_USER_COUNT, 2, threadCount, batchSize));
-
         waitFutures(futures);
         futures.clear();
-
         // 3. 生成3级用户
         futures.addAll(submitUserTasks(executor, 1, CHILD_USER_COUNT, 3, threadCount, batchSize));
-
         long inserted = waitFutures(futures);
-
         executor.shutdown();
-
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         result.put("success", true);
         result.put("type", "users");
@@ -386,6 +800,7 @@ public class TestService {
         result.put("costMs", System.currentTimeMillis() - startTime);
         return result;
     }
+
     private List<Future<Long>> submitUserTasks(ExecutorService executor,
                                                int startIndex,
                                                int endIndex,
@@ -445,12 +860,9 @@ public class TestService {
 
     private TUser buildUser(int index, int userType) {
         TUser user = new TUser();
-
         Date now = new Date();
-
         String userNum;
         String parentNum;
-
         if (userType == 4) {
             userNum = buildAgentUserNum(index);
             parentNum = ROOT_PARENT_NUM;
@@ -463,7 +875,6 @@ public class TestService {
         } else {
             throw new IllegalArgumentException("不支持的userType：" + userType);
         }
-
         user.setUserNum(userNum);
         user.setParentNum(parentNum);
         user.setMemberNum("MEM" + userNum);
@@ -498,7 +909,6 @@ public class TestService {
         user.setAreaCode("0");
         user.setVerifyPhone(1);
         user.setAllowWithdraw(1);
-
         return user;
     }
 
@@ -707,39 +1117,25 @@ public class TestService {
         order.setTradSuccessTime(successTime);
         order.setTradFailTime(null);
         order.setTradCancelTime(null);
-
         order.setShipmentStatus(1);
         order.setOrderStatus(1);
         order.setSettlementStatus(1);
-        order.setBuyerAccount("buyer_" + (index % 10000000));
         order.setPayMethod(0);
-
         order.setMachineNo(machineNo);
         order.setParentUserNum(ROOT_PARENT_NUM);
         order.setAgentUserNum(agentUserNum);
         order.setGoodsName("泡泡车套餐");
         order.setChannelId((int) (index % 10) + 1);
-        order.setTotalCount(1);
-
         BigDecimal price = BigDecimal.valueOf(((index % 20) + 1)).setScale(2, BigDecimal.ROUND_HALF_UP);
         order.setTotalPrice(price);
-
         order.setUserNum(merchantUserNum);
-        order.setErrorInfo(null);
-
-        order.setFalg1(null);
-        order.setFlag2(null);
-        order.setFlag3(null);
-
         order.setAccountType(1);
         order.setGoodsNum("GOODS" + ((index % 100) + 1));
         order.setGoodsRemark("测试商品");
         order.setTradeNo("TRADE" + String.format("%012d", index));
 
-        order.setIsMachineReturned(0);
         order.setReturnPrice(BigDecimal.ZERO);
         order.setTotalTime((int) ((index % 60) + 1));
-        order.setDepositConfig("50,5,10,5");
         order.setSite("测试场地_" + (machineIndex % 10000));
         order.setChildUserNums(null);
 

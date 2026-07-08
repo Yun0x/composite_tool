@@ -203,4 +203,10 @@ public class TMachineCarInfo implements Serializable {
      * 例如：50,5,10,5 表示押金50元，5分钟内免费，10元/5分钟
      */
     private String depositConfig;
+
+
+    /**
+     * 到期时间
+     */
+    private Date exTime;
 }

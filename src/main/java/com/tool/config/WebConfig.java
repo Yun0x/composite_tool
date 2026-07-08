@@ -13,7 +13,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
     public WebConfig() {
-        System.out.println("🔥 WebConfig 加载了");
+//        System.out.println("🔥 WebConfig 加载了");
     }
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

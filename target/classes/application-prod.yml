@@ -1,15 +1,69 @@
-spring:
-  datasource:
-    url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/cannon?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
-    username: shanling
-    password: Shanling1
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      idle-timeout: 30000
-      max-lifetime: 1800000
-      connection-timeout: 30000
+
+app:
+  dynamic-datasource:
+    default-key: db0
+    sources:
+      db0:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/shouhuoji?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+      db1:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/shouhuoji?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+      db2:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/cannon?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+      db3:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/drum?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+      db4:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/xiaoxiaole?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+      base:
+        url: jdbc:mysql://rm-m5eg06bx8m57se5uxzo.mysql.rds.aliyuncs.com:3306/base?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&zeroDateTimeBehavior=convertToNull&allowMultiQueries=true
+        username: shanling
+        password: Shanling1
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        maximum-pool-size: 10
+        minimum-idle: 5
+        idle-timeout: 30000
+        max-lifetime: 1800000
+        connection-timeout: 30000
+
 file:
   excelPath: /tmp
 

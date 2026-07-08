@@ -79,10 +79,6 @@ public class TOrderCarInfo implements Serializable {
      */
     private Integer settlementStatus;
 
-    /**
-     * 买家账号
-     */
-    private String buyerAccount;
 
     /**
      * 0正常订单 1押金订单
@@ -115,11 +111,6 @@ public class TOrderCarInfo implements Serializable {
     private Integer channelId;
 
     /**
-     * 订单数量
-     */
-    private Integer totalCount;
-
-    /**
      * 普通订单对应订单金额，押金订单对应消费金额
      */
     private BigDecimal totalPrice;
@@ -129,25 +120,6 @@ public class TOrderCarInfo implements Serializable {
      */
     private String userNum;
 
-    /**
-     * 订单错误信息
-     */
-    private String errorInfo;
-
-    /**
-     * 扩展字段1
-     */
-    private String falg1;
-
-    /**
-     * 扩展字段2
-     */
-    private String flag2;
-
-    /**
-     * 扩展字段3
-     */
-    private String flag3;
 
     /**
      * 1代收 2自收
@@ -170,11 +142,6 @@ public class TOrderCarInfo implements Serializable {
     private String tradeNo;
 
     /**
-     * 设备是否退还 0否 1是 默认为0
-     */
-    private Integer isMachineReturned;
-
-    /**
      * 退还金额
      */
     private BigDecimal returnPrice;
@@ -185,12 +152,6 @@ public class TOrderCarInfo implements Serializable {
     private Integer totalTime;
 
     /**
-     * 押金配置，格式：押金金额,免费时长,单价,时间
-     * 例如：50,5,10,5 表示押金50元，5分钟内免费，10元/5分钟
-     */
-    private String depositConfig;
-
-    /**
      * 场地
      */
     private String site;
@@ -199,4 +160,6 @@ public class TOrderCarInfo implements Serializable {
      * 子账号
      */
     private String childUserNums;
+
+
 }

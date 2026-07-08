@@ -18,48 +18,140 @@
         from t_simcard_info limit 1000
     </select>
     <select id="getMachineInfoByNo" resultType="com.tool.vo.testVO.TMachineCarInfo">
-        select *
-        from t_machine_car_info
-        where machine_no = #{machineNo} limit 1
+        select t1.*, t2.expiry_date as exTime
+        from t_machine_car_info t1
+                 LEFT JOIN t_simcard_info t2 on t1.imsi = t2.imsi
+        where t1.machine_no = #{machineNo} limit 1
     </select>
+    <select id="getMachineInfoByNoOnAlcohol" resultType="com.tool.vo.testVO.TMachineCarInfo">
+        select t1.*, t2.expiry_date as exTime
+        from t_machine_alcohol_info t1
+                 LEFT JOIN t_simcard_info t2 on t1.imsi = t2.imsi
+        where t1.machine_no = #{machineNo} limit 1
+    </select>
+    <select id="getMachineInfoByNoOnDrum" resultType="com.tool.vo.testVO.TMachineCarInfo">
+        select t1.*, t2.expiry_date as exTime
+        from t_machine_drum_info t1
+                 LEFT JOIN t_simcard_info t2 on t1.imsi = t2.imsi
+        where t1.machine_no = #{machineNo} limit 1
+    </select>
+
     <select id="getMinOrderId" resultType="java.lang.Integer">
-        SELECT
-            MIN(order_id)
-        FROM
-            t_order_car_info
+        SELECT MIN(order_id)
+        FROM t_order_car_info
     </select>
 
     <select id="getMaxOrderId" resultType="java.lang.Integer">
-        SELECT
-            MAX(order_id)
-        FROM
-            t_order_car_info
+        SELECT MAX(order_id)
+        FROM t_order_car_info
     </select>
+
+    <select id="getMinOrderIdOnAlcohol" resultType="java.lang.Integer">
+        SELECT MIN(order_id)
+        FROM t_order_alcohol_info
+    </select>
+
+
+    <select id="getMaxOrderIdOnAlcohol" resultType="java.lang.Integer">
+        SELECT MAX(order_id)
+        FROM t_order_alcohol_info
+    </select>
+
+    <select id="getMinOrderIdOnDrum" resultType="java.lang.Integer">
+        SELECT MIN(order_id)
+        FROM t_order_drum_info
+    </select>
+
+
+    <select id="getMaxOrderIdOnDrum" resultType="java.lang.Integer">
+        SELECT MAX(order_id)
+        FROM t_order_drum_info
+    </select>
+
     <select id="checkMachineOrderExist" resultType="java.lang.Integer">
-        SELECT
-            1
-        FROM
-            t_order_car_info
-        WHERE
-            order_id BETWEEN #{startOrderId} AND #{endOrderId}
+        SELECT 1
+        FROM t_order_car_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
           AND machine_no = #{machineNo}
-            LIMIT 1
+          AND order_status = 1 LIMIT 1
     </select>
+    <select id="checkMachineOrderExistInAlcohol" resultType="java.lang.Integer">
+        SELECT 1
+        FROM t_order_alcohol_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+          AND order_status = 1 LIMIT 1
+    </select>
+
+    <select id="checkMachineOrderExistInDrum" resultType="java.lang.Integer">
+        SELECT 1
+        FROM t_order_drum_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+          AND order_status = 1 LIMIT 1
+    </select>
+
     <select id="getFirstOrderByMachineNoInRange" resultType="com.tool.vo.testVO.TOrderCarInfo">
-        SELECT
-            *
-        FROM
-            t_order_car_info
-        WHERE
-            order_id BETWEEN #{startOrderId} AND #{endOrderId}
-          AND machine_no = #{machineNo} and order_status = 1
-        ORDER BY
-            order_id ASC
-            LIMIT 1
+        SELECT *
+        FROM t_order_car_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+          and order_status = 1
+        ORDER BY order_id ASC LIMIT 10
+    </select>
+    <select id="getFirstOrderByMachineNoInAlcRange" resultType="com.tool.vo.testVO.TOrderCarInfo">
+        SELECT *
+        FROM t_order_alcohol_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+          and order_status = 1
+        ORDER BY order_id ASC LIMIT 10
+    </select>
+    <select id="getFirstOrderByMachineNoInDrumRange" resultType="com.tool.vo.testVO.TOrderCarInfo">
+        SELECT *
+        FROM t_order_drum_info
+        WHERE order_id BETWEEN #{startOrderId} AND #{endOrderId}
+          AND machine_no = #{machineNo}
+          and order_status = 1
+        ORDER BY order_id ASC LIMIT 10
     </select>
     <select id="getUserInfo" resultType="com.tool.vo.testVO.TUser">
-        select * from t_user where user_num = #{userNum} or user_num = #{agentUserNum} or user_num = #{parentUserNum}
+        select *
+        from t_user
+        where user_num = #{userNum}
+           or user_num = #{agentUserNum}
+           or user_num = #{parentUserNum}
     </select>
+    <select id="getOrderTime" resultType="java.util.Date">
+        select trad_create_time
+        from t_order_car_info
+        where order_id = #{midOrderId}
+    </select>
+    <select id="getOrderTimeOnAlcohol" resultType="java.util.Date">
+        select trad_create_time
+        from t_order_alcohol_info
+        where order_id = #{midOrderId}
+    </select>
+    <select id="getOrderTimeOnDrum" resultType="java.util.Date">
+        select trad_create_time
+        from t_order_drum_info
+        where order_id = #{midOrderId}
+    </select>
+    <select id="getGetCheckInfoByMachine" resultType="com.tool.vo.testVO.TCheckInfo">
+        select *
+        from t_check_log
+        where machine_no = #{machineNo}
+        order by log_id desc limit 1;
+    </select>
+    <select id="checkToolLogin" resultType="java.lang.String">
+        select login_name
+        from t_tool_user
+        where login_name = #{username}
+          and password = #{password}
+          and is_delete = 0
+    </select>
+
+
     <insert id="batchInsertUsers">
         INSERT INTO t_user
         (

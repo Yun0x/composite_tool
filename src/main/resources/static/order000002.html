@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>信息查询</title>
+    <style>
+        :root {
+            font-family: Arial, "Microsoft YaHei", sans-serif;
+            color: #18212f;
+            background: #f4f6f9;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 16px;
+        }
+
+        main {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 18px;
+            font-size: 26px;
+            line-height: 1.25;
+        }
+
+        h2 {
+            margin: 0 0 14px;
+            font-size: 17px;
+            line-height: 1.35;
+        }
+
+        .panel {
+            margin-bottom: 16px;
+            padding: 18px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        .field {
+            flex: 1 1 300px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            height: 42px;
+            padding: 0 12px;
+            border: 1px solid #b9c3d0;
+            border-radius: 6px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        button {
+            height: 42px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .status {
+            min-height: 22px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        .status.error {
+            color: #b91c1c;
+        }
+
+        .status.loading {
+            color: #1d4ed8;
+        }
+
+        .result {
+            display: none;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 16px;
+        }
+
+        .detail-item {
+            min-width: 0;
+        }
+
+        .detail-wide {
+            grid-column: 1 / -1;
+        }
+
+        .detail-label {
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #667085;
+        }
+
+        .detail-value {
+            min-height: 22px;
+            font-size: 14px;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+
+        .check-result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 16px;
+        }
+
+        .check-result-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            padding: 10px 12px;
+            border: 1px solid #e3e8ef;
+            border-radius: 6px;
+            background: #fbfdff;
+        }
+
+        .check-result-name {
+            min-width: 0;
+            word-break: break-word;
+            color: #334155;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e3e8ef;
+            text-align: left;
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #eef2f7;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .empty {
+            color: #667085;
+            font-size: 14px;
+        }
+
+        .result-ok,
+        .result-no {
+            display: inline-flex;
+            align-items: center;
+            min-width: 34px;
+            height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .result-ok {
+            color: #166534;
+            background: #dcfce7;
+        }
+
+        .result-no {
+            color: #991b1b;
+            background: #fee2e2;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>信息查询</h1>
+
+    <section class="panel">
+        <form id="queryForm">
+            <div class="field">
+                <label for="machineNo">设备编号</label>
+                <input id="machineNo" name="machineNo" autocomplete="off" placeholder="请输入 machineNo">
+            </div>
+            <button id="queryButton" type="submit">查询首单</button>
+        </form>
+        <div id="status" class="status"></div>
+    </section>
+
+    <div id="result" class="result">
+        <section class="panel">
+            <h2>设备信息</h2>
+            <div id="deviceInfo" class="detail-grid"></div>
+        </section>
+
+        <section class="panel">
+            <h2>出厂质检信息</h2>
+            <div id="checkInfo" class="detail-grid"></div>
+        </section>
+
+        <section class="panel">
+            <h2>首笔订单信息</h2>
+            <div id="firstOrderInfo" class="detail-grid"></div>
+        </section>
+
+        <section class="panel">
+            <h2>前十条订单信息</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>订单编号</th>
+                        <th>订单品牌方登录名</th>
+                        <th>合伙人登录名</th>
+                        <th>代理商登录名</th>
+                        <th>金额</th>
+                        <th>订单时间</th>
+                    </tr>
+                    </thead>
+                    <tbody id="orderRows"></tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script>
+    const form = document.getElementById('queryForm');
+    const machineNoInput = document.getElementById('machineNo');
+    const queryButton = document.getElementById('queryButton');
+    const statusBox = document.getElementById('status');
+    const resultBox = document.getElementById('result');
+    const deviceInfoBox = document.getElementById('deviceInfo');
+    const checkInfoBox = document.getElementById('checkInfo');
+    const firstOrderInfoBox = document.getElementById('firstOrderInfo');
+    const orderRows = document.getElementById('orderRows');
+
+    const deviceFields = ['设备编号', '品牌方登录名', '合伙人登录名', '代理商登录名', '场地', '到期时间', '创建时间'];
+    const checkFields = ['质检人登录名', '质检结果', '质检时间'];
+    const firstOrderFields = ['订单编号', '订单品牌方登录名', '合伙人登录名', '代理商登录名','金额', '订单时间'];
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const machineNo = machineNoInput.value.trim();
+        if (!machineNo) {
+            showStatus('machineNo不能为空', 'error');
+            return;
+        }
+
+        setLoading(true);
+        showStatus('查询中...', 'loading');
+        resultBox.style.display = 'none';
+
+        try {
+            const response = await fetch('/test/getFirstOrder?machineNo=' + encodeURIComponent(machineNo), {
+                method: 'POST'
+            });
+            const body = await response.json();
+            const payload = body && body.data ? body.data : body;
+
+            if (!payload || payload.code !== 200) {
+                showStatus((payload && payload.msg) || (body && body.message) || '查询失败', 'error');
+                return;
+            }
+
+            renderDetails(deviceInfoBox, payload['设备信息'], deviceFields);
+            renderDetails(checkInfoBox, payload['出厂质检信息'], checkFields);
+            renderDetails(firstOrderInfoBox, payload['首笔订单信息'], firstOrderFields);
+            renderOrders(payload['前十条订单信息']);
+            resultBox.style.display = 'block';
+            showStatus('查询完成', '');
+        } catch (error) {
+            showStatus('请求失败：' + error.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function renderDetails(container, data, fields) {
+        container.innerHTML = '';
+        fields.forEach(function (field) {
+
+            const item = document.createElement('div');
+            if (field == '订单时间'){
+                item.style.color = 'red'
+            }
+            item.className = field === '质检结果' ? 'detail-item detail-wide' : 'detail-item';
+
+            const label = document.createElement('div');
+            label.className = 'detail-label';
+            label.textContent = field;
+            item.appendChild(label);
+
+            const value = document.createElement('div');
+            value.className = 'detail-value';
+            const fieldValue = data && data[field];
+            if (field === '质检结果' && Array.isArray(fieldValue)) {
+                renderCheckResult(value, fieldValue);
+            } else {
+                value.textContent = formatValue(fieldValue);
+            }
+            item.appendChild(value);
+
+            container.appendChild(item);
+        });
+    }
+
+    function renderCheckResult(container, items) {
+        if (!Array.isArray(items) || items.length === 0) {
+            container.textContent = '-';
+            return;
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'check-result-grid';
+
+        items.forEach(function (item) {
+            const row = document.createElement('div');
+            row.className = 'check-result-item';
+
+            const nameCell = document.createElement('div');
+            nameCell.className = 'check-result-name';
+            nameCell.textContent = formatValue(item && item['检查项']);
+            row.appendChild(nameCell);
+
+            const resultCell = document.createElement('div');
+            const result = formatValue(item && item['结果']);
+            const badge = document.createElement('span');
+            badge.className = result === '是' ? 'result-ok' : (result === '否' ? 'result-no' : '');
+            badge.textContent = result;
+            resultCell.appendChild(badge);
+            row.appendChild(resultCell);
+
+            grid.appendChild(row);
+        });
+        container.appendChild(grid);
+    }
+
+    function renderOrders(orders) {
+        orderRows.innerHTML = '';
+        if (!Array.isArray(orders) || orders.length === 0) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 5;
+            cell.className = 'empty';
+            cell.textContent = '暂无订单';
+            row.appendChild(cell);
+            orderRows.appendChild(row);
+            return;
+        }
+
+        orders.slice(0, 10).forEach(function (order) {
+            const row = document.createElement('tr');
+            firstOrderFields.forEach(function (field) {
+                const cell = document.createElement('td');
+                cell.textContent = formatValue(order && order[field]);
+                row.appendChild(cell);
+            });
+            orderRows.appendChild(row);
+        });
+    }
+
+    function formatValue(value) {
+        if (value === null || value === undefined || value === '') {
+            return '-';
+        }
+        return String(value);
+    }
+
+    function setLoading(loading) {
+        queryButton.disabled = loading;
+        queryButton.textContent = loading ? '查询中...' : '查询首单';
+    }
+
+    function showStatus(message, type) {
+        statusBox.textContent = message || '';
+        statusBox.className = 'status' + (type ? ' ' + type : '');
+    }
+</script>
+</body>
+</html>

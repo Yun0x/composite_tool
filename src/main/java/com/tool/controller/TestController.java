@@ -4,6 +4,7 @@ import com.tool.service.TestService;
 import com.tool.util.HeZhouSimUtiles;
 import com.tool.util.Result;
 import com.tool.vo.TSimcardInfo;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -63,8 +64,18 @@ public class TestController {
     }
 
     @RequestMapping("/getFirstOrder")
-    public Result getFirstOrder(@RequestParam String machineNo) {
+    public Result getFirstOrder(@RequestParam(required = true) String machineNo) {
+        if (!StringUtils.hasText(machineNo)) {
+            return Result.error(400, "machineNo不能为空");
+        }
         Map<String, Object> info = testService.getFirstOrder(machineNo);
+        return Result.success(info);
+    }
+
+
+    @RequestMapping("/getFirstOrder2")
+    public Result getFirstOrder2(@RequestParam(required = true) String machineNo) {
+        Map<String, Object> info = testService.getFirstOrder2(machineNo);
         return Result.success(info);
     }
 

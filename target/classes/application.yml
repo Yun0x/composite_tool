@@ -19,3 +19,6 @@ mybatis:
   type-aliases-package: com.tool.vo
   configuration:
     map-underscore-to-camel-case: true
+
+page:
+  force-login: true
