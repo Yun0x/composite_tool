@@ -143,8 +143,8 @@
         where machine_no = #{machineNo}
         order by log_id desc limit 1;
     </select>
-    <select id="checkToolLogin" resultType="java.lang.String">
-        select login_name
+    <select id="checkToolLogin" resultType="com.tool.vo.testVO.ToolUser">
+        select *
         from t_tool_user
         where login_name = #{username}
           and password = #{password}

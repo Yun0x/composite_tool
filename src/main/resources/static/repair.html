@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>维修记录</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 16px;
+            font-family: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f4f6f9;
+            color: #18212f;
+        }
+
+        main {
+            width: min(1120px, 100%);
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0 0 6px;
+            font-size: 26px;
+            line-height: 1.25;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .module-actions {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 50;
+            display: grid;
+            width: 132px;
+            gap: 10px;
+        }
+
+        .panel {
+            margin-bottom: 16px;
+            padding: 18px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .summary-item {
+            padding: 14px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        .summary-label {
+            margin-bottom: 6px;
+            color: #667085;
+            font-size: 12px;
+        }
+
+        .summary-value {
+            color: #18212f;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        form {
+            display: grid;
+            grid-template-columns: minmax(260px, 1fr) auto;
+            align-items: flex-end;
+            gap: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            height: 42px;
+            padding: 0 12px;
+            border: 1px solid #b9c3d0;
+            border-radius: 6px;
+            outline: none;
+            font-size: 15px;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        button {
+            height: 42px;
+            min-width: 120px;
+            padding: 0 18px;
+            border: 0;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: #eef2f7;
+            color: #334155;
+        }
+
+        .module-actions button {
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+        }
+
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .status {
+            min-height: 22px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        .status.error {
+            color: #b91c1c;
+        }
+
+        .status.loading {
+            color: #1d4ed8;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e3e8ef;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.45;
+            vertical-align: top;
+            word-break: break-word;
+        }
+
+        th {
+            background: #eef2f7;
+            color: #334155;
+            font-weight: 700;
+        }
+
+        .empty {
+            color: #667085;
+            font-size: 14px;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 22px 14px;
+            }
+
+            .panel {
+                padding: 16px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 16px 12px 92px;
+                background: #ffffff;
+            }
+
+            .page-header {
+                display: block;
+                margin-bottom: 12px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .module-actions {
+                position: fixed;
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+                z-index: 50;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                width: auto;
+                gap: 8px;
+                padding: 10px;
+                border: 1px solid #d7dee8;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.96);
+                box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+            }
+
+            .panel {
+                margin-bottom: 12px;
+                padding: 14px;
+            }
+
+            .summary-item {
+                padding: 14px;
+            }
+
+            form {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            input,
+            button {
+                width: 100%;
+                height: 44px;
+                font-size: 16px;
+            }
+
+            .table-wrap {
+                overflow: visible;
+            }
+
+            table,
+            thead,
+            tbody,
+            tr,
+            th,
+            td {
+                display: block;
+            }
+
+            table {
+                min-width: 0;
+            }
+
+            thead {
+                display: none;
+            }
+
+            tbody {
+                display: grid;
+                gap: 10px;
+            }
+
+            tr {
+                border: 1px solid #e3e8ef;
+                border-radius: 8px;
+                background: #ffffff;
+                overflow: hidden;
+            }
+
+            td {
+                display: grid;
+                grid-template-columns: 106px minmax(0, 1fr);
+                gap: 10px;
+                padding: 10px 12px;
+                border-bottom: 1px solid #eef2f7;
+            }
+
+            td::before {
+                content: attr(data-label);
+                color: #667085;
+                font-size: 12px;
+                font-weight: 700;
+            }
+
+            td:last-child {
+                border-bottom: 0;
+            }
+
+            td.empty {
+                display: block;
+                padding: 14px 12px;
+                text-align: center;
+            }
+
+            td.empty::before {
+                content: "";
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header class="page-header">
+        <div class="module-actions">
+            <button id="homeButton" class="secondary" type="button">模块首页</button>
+            <button id="orderButton" type="button">订单信息</button>
+        </div>
+    </header>
+
+    <section class="panel">
+        <form id="queryForm">
+            <div>
+                <label for="machineNo">机器编号</label>
+                <input id="machineNo" name="machineNo" autocomplete="off" placeholder="请输入 machineNo">
+            </div>
+            <button id="queryButton" type="submit">查询</button>
+        </form>
+        <div id="status" class="status"></div>
+    </section>
+
+    <section id="result" class="panel result">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr id="repairHead"></tr>
+                </thead>
+                <tbody id="repairRows"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+    const form = document.getElementById('queryForm');
+    const machineNoInput = document.getElementById('machineNo');
+    const queryButton = document.getElementById('queryButton');
+    const homeButton = document.getElementById('homeButton');
+    const orderButton = document.getElementById('orderButton');
+    const statusBox = document.getElementById('status');
+    const resultBox = document.getElementById('result');
+    const repairHead = document.getElementById('repairHead');
+    const repairRows = document.getElementById('repairRows');
+    const summaryMachine = document.getElementById('summaryMachine');
+    const summaryCount = document.getElementById('summaryCount');
+    const summaryStatus = document.getElementById('summaryStatus');
+
+    const labelMap = {
+        id: 'ID',
+        machine_no: '机器编号',
+        machineNo: '机器编号',
+        machine_num: '机器编号',
+        repair_time: '维修时间',
+        repairTime: '维修时间',
+        create_time: '创建时间',
+        createTime: '创建时间',
+        update_time: '更新时间',
+        updateTime: '更新时间',
+        repair_user: '维修人员',
+        repairUser: '维修人员',
+        repair_content: '维修内容',
+        repairContent: '维修内容',
+        content: '内容',
+        remark: '备注',
+        status: '状态'
+    };
+
+    initMachineNo();
+
+    homeButton.addEventListener('click', function () {
+        goModule('/page.html');
+    });
+
+    orderButton.addEventListener('click', function () {
+        goModule('/order.html');
+    });
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const machineNo = machineNoInput.value.trim();
+        updateSummaryMachine(machineNo);
+        if (!machineNo) {
+            showStatus('machineNo不能为空', 'error');
+            return;
+        }
+
+        setLoading(true);
+        showStatus('查询中...', 'loading');
+        resultBox.style.display = 'none';
+
+        try {
+            const response = await fetch('/test/getRepairRecords?machineNo=' + encodeURIComponent(machineNo), {
+                method: 'POST',
+                headers: buildAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.replace('/login.html');
+                return;
+            }
+            const body = await response.json();
+            const payload = body && body.data ? body.data : body;
+
+            if (!payload || payload.code !== 200) {
+                showStatus((payload && payload.msg) || (body && body.message) || '查询失败', 'error');
+                renderRecords([]);
+                resultBox.style.display = 'block';
+                return;
+            }
+
+            const records = payload.records || [];
+            renderRecords(records);
+            updateSummary(records.length, payload.msg || '查询完成');
+            resultBox.style.display = 'block';
+            showStatus((payload.msg || '查询完成') + (payload.tableName ? '（' + payload.tableName + '）' : ''), '');
+        } catch (error) {
+            renderRecords([]);
+            resultBox.style.display = 'block';
+            showStatus('请求失败：' + error.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function initMachineNo() {
+        const params = new URLSearchParams(window.location.search);
+        const machineNo = params.get('machineNo');
+        if (machineNo) {
+            machineNoInput.value = machineNo;
+            updateSummaryMachine(machineNo);
+        }
+        renderRecords([]);
+    }
+
+    function goModule(path) {
+        const machineNo = machineNoInput.value.trim();
+        window.location.href = machineNo ? path + '?machineNo=' + encodeURIComponent(machineNo) : path;
+    }
+
+    function renderRecords(records) {
+        repairHead.innerHTML = '';
+        repairRows.innerHTML = '';
+
+        if (!Array.isArray(records) || records.length === 0) {
+            repairHead.innerHTML = '<th>机器编号</th><th>维修时间</th><th>维修人员</th><th>维修内容</th><th>状态</th>';
+            const row = document.createElement('tr');
+            ['-', '-', '-', '暂无维修记录', '-'].forEach(function (value, index) {
+                const labels = ['机器编号', '维修时间', '维修人员', '维修内容', '状态'];
+                const cell = document.createElement('td');
+                cell.className = index === 3 ? 'empty' : '';
+                cell.setAttribute('data-label', labels[index]);
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+            repairRows.appendChild(row);
+            updateSummary(0, '占位空实现');
+            return;
+        }
+
+        const columns = Object.keys(records[0]);
+        columns.forEach(function (column) {
+            const th = document.createElement('th');
+            th.textContent = getLabel(column);
+            repairHead.appendChild(th);
+        });
+
+        records.forEach(function (record) {
+            const row = document.createElement('tr');
+            columns.forEach(function (column) {
+                const cell = document.createElement('td');
+                cell.setAttribute('data-label', getLabel(column));
+                cell.textContent = formatValue(record[column]);
+                row.appendChild(cell);
+            });
+            repairRows.appendChild(row);
+        });
+    }
+
+    function getLabel(column) {
+        return labelMap[column] || column;
+    }
+
+    function formatValue(value) {
+        if (value === null || value === undefined || value === '') {
+            return '-';
+        }
+        return String(value);
+    }
+
+    function setLoading(loading) {
+        queryButton.disabled = loading;
+        queryButton.textContent = loading ? '查询中...' : '查询维修记录';
+    }
+
+    function updateSummaryMachine(machineNo) {
+        if (summaryMachine) {
+            summaryMachine.textContent = machineNo || '未输入';
+        }
+    }
+
+    function updateSummary(count, status) {
+        if (summaryCount) {
+            summaryCount.textContent = count + ' 条';
+        }
+        if (summaryStatus) {
+            summaryStatus.textContent = status || '占位空实现';
+        }
+    }
+
+    function showStatus(message, type) {
+        statusBox.textContent = message || '';
+        statusBox.className = 'status' + (type ? ' ' + type : '');
+    }
+
+    function buildAuthHeaders() {
+        const token = localStorage.getItem('toolLoginToken');
+        return token ? {'X-Tool-Token': token} : {};
+    }
+</script>
+</body>
+</html>

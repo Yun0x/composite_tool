@@ -3,7 +3,11 @@ package com.tool.controller;
 import com.tool.service.TestService;
 import com.tool.util.HeZhouSimUtiles;
 import com.tool.util.Result;
+import com.tool.util.TokenUtil;
 import com.tool.vo.TSimcardInfo;
+import com.tool.vo.testVO.ToolUser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +18,7 @@ import java.util.*;
 @RequestMapping("/test")
 public class TestController {
 
+    private static final Logger logger = LoggerFactory.getLogger(TestController.class);
 
     @Resource
     private TestService testService;
@@ -65,10 +70,18 @@ public class TestController {
 
     @RequestMapping("/getFirstOrder")
     public Result getFirstOrder(@RequestParam(required = true) String machineNo) {
+        logger.info("方法：getFirstOrder， 登录名 {}  机器编号 {}", getCurrentLoginName(), machineNo);
         if (!StringUtils.hasText(machineNo)) {
             return Result.error(400, "machineNo不能为空");
         }
         Map<String, Object> info = testService.getFirstOrder(machineNo);
+        return Result.success(info);
+    }
+
+    @RequestMapping("/getRepairRecords")
+    public Result getRepairRecords(@RequestParam(required = true) String machineNo) {
+        logger.info("方法：getRepairRecords， 登录名{}  机器编号{}", getCurrentLoginName(), machineNo);
+        Map<String, Object> info = testService.getRepairRecords(machineNo);
         return Result.success(info);
     }
 
@@ -85,5 +98,12 @@ public class TestController {
         return testService.generateAll();
     }
 
+    private String getCurrentLoginName() {
+        ToolUser toolUser = TokenUtil.getToolUser();
+        if (toolUser == null || !StringUtils.hasText(toolUser.getLoginName())) {
+            return "unknown";
+        }
+        return toolUser.getLoginName();
+    }
 
 }

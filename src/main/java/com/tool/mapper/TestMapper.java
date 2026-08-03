@@ -1,9 +1,6 @@
 package com.tool.mapper;
 
-import com.tool.vo.testVO.TCheckInfo;
-import com.tool.vo.testVO.TMachineCarInfo;
-import com.tool.vo.testVO.TOrderCarInfo;
-import com.tool.vo.testVO.TUser;
+import com.tool.vo.testVO.*;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.Date;
@@ -72,6 +69,6 @@ public interface TestMapper {
 
     Date getOrderTimeOnDrum(Integer mid);
 
-    String checkToolLogin(@Param("username") String username, @Param("password") String password);
+    ToolUser checkToolLogin(@Param("username") String username, @Param("password") String password);
 
 }

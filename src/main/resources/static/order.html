@@ -27,16 +27,45 @@
             margin: 0 auto;
         }
 
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .page-title {
+            min-width: 0;
+        }
+
         h1 {
-            margin: 0 0 18px;
+            margin: 0 0 6px;
             font-size: 26px;
             line-height: 1.25;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         h2 {
             margin: 0 0 14px;
             font-size: 17px;
             line-height: 1.35;
+        }
+
+        .module-actions {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            z-index: 50;
+            display: grid;
+            width: 132px;
+            gap: 10px;
         }
 
         .panel {
@@ -96,6 +125,15 @@
         button:disabled {
             background: #94a3b8;
             cursor: not-allowed;
+        }
+
+        .module-actions button {
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+        }
+
+        button.secondary {
+            background: #eef2f7;
+            color: #334155;
         }
 
         .status {
@@ -240,13 +278,35 @@
 
         @media (max-width: 640px) {
             body {
-                padding: 16px 12px 24px;
+                padding: 16px 12px 92px;
                 background: #ffffff;
             }
 
             h1 {
                 margin-bottom: 14px;
                 font-size: 22px;
+            }
+
+            .page-header {
+                display: block;
+                margin-bottom: 12px;
+            }
+
+            .module-actions {
+                position: fixed;
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+                z-index: 50;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                width: auto;
+                gap: 8px;
+                padding: 10px;
+                border: 1px solid #d7dee8;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.96);
+                box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
             }
 
             h2 {
@@ -358,7 +418,12 @@
 </head>
 <body>
 <main>
-    <h1>信息查询</h1>
+    <header class="page-header">
+        <div class="module-actions">
+            <button id="homeButton" class="secondary" type="button">模块首页</button>
+            <button id="repairButton" type="button">维修记录</button>
+        </div>
+    </header>
 
     <section class="panel">
         <form id="queryForm">
@@ -366,7 +431,7 @@
                 <label for="machineNo">设备编号</label>
                 <input id="machineNo" name="machineNo" autocomplete="off" placeholder="请输入 machineNo">
             </div>
-            <button id="queryButton" type="submit">查询首单</button>
+            <button id="queryButton" type="submit">查询</button>
         </form>
         <div id="status" class="status"></div>
     </section>
@@ -412,6 +477,8 @@
     const form = document.getElementById('queryForm');
     const machineNoInput = document.getElementById('machineNo');
     const queryButton = document.getElementById('queryButton');
+    const homeButton = document.getElementById('homeButton');
+    const repairButton = document.getElementById('repairButton');
     const statusBox = document.getElementById('status');
     const resultBox = document.getElementById('result');
     const deviceInfoBox = document.getElementById('deviceInfo');
@@ -422,6 +489,16 @@
     const deviceFields = ['设备编号', '品牌方登录名', '合伙人登录名', '代理商登录名', '场地', '到期时间', '创建时间'];
     const checkFields = ['质检人登录名', '质检结果', '质检时间'];
     const firstOrderFields = ['订单编号', '订单品牌方登录名', '合伙人登录名', '代理商登录名','金额', '订单时间'];
+
+    initMachineNo();
+
+    homeButton.addEventListener('click', function () {
+        goModule('/page.html');
+    });
+
+    repairButton.addEventListener('click', function () {
+        goModule('/repair.html');
+    });
 
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
@@ -437,8 +514,13 @@
 
         try {
             const response = await fetch('/test/getFirstOrder?machineNo=' + encodeURIComponent(machineNo), {
-                method: 'POST'
+                method: 'POST',
+                headers: buildAuthHeaders()
             });
+            if (response.status === 401) {
+                window.location.replace('/login.html');
+                return;
+            }
             const body = await response.json();
             const payload = body && body.data ? body.data : body;
 
@@ -459,6 +541,24 @@
             setLoading(false);
         }
     });
+
+    function initMachineNo() {
+        const params = new URLSearchParams(window.location.search);
+        const machineNo = params.get('machineNo');
+        if (machineNo) {
+            machineNoInput.value = machineNo;
+        }
+    }
+
+    function goModule(path) {
+        const machineNo = machineNoInput.value.trim();
+        window.location.href = machineNo ? path + '?machineNo=' + encodeURIComponent(machineNo) : path;
+    }
+
+    function buildAuthHeaders() {
+        const token = localStorage.getItem('toolLoginToken');
+        return token ? {'X-Tool-Token': token} : {};
+    }
 
     function renderDetails(container, data, fields) {
         container.innerHTML = '';

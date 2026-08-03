@@ -13,7 +13,7 @@ REM ============================================================
 REM ===================== 你只需要改这里 =====================
 
 set "GITEE_URL=https://gitee.com/yunox/composite-tool.git"
-set "GITHUB_URL=git@github.com:Yun0x/common_tool.git"
+set "GITHUB_URL=git@github.com:Yun0x/composite_tool.git"
 
 REM 远程仓库名称，一般不用改
 set "GITEE_REMOTE=gitee"

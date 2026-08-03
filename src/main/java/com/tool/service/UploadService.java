@@ -1767,6 +1767,55 @@ public class UploadService {
             String jsonPath = runPythonParse(outPutPath, delayTime);
             File file = new File(jsonPath);
             String fileName = file.getName().substring(0, file.getName().lastIndexOf('.'));
+            File binOutputFile = new File(
+                    new File(outPutPath, fileName),
+                    fileName + "_level2.bin"
+            );
+            return convertJsonToLevel2Bin(jsonPath, binOutputFile);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private Boolean convertUploadedXml(File xmlFile, String outputDir, String baseName, Integer delayTime) {
+        Path tempDir = null;
+        Path tempXml = null;
+        Path tempJson = null;
+        try {
+            // Python 脚本当前只接收目录并转换其中排序后的第一个 XML。
+            // 每次上传使用独立临时目录，避免批量上传时串到 outputDir 中的其他歌曲。
+            tempDir = Files.createTempDirectory("musicxml_");
+            tempXml = tempDir.resolve("input.xml");
+            Files.copy(xmlFile.toPath(), tempXml, StandardCopyOption.REPLACE_EXISTING);
+
+            String jsonPath = runPythonParse(tempDir.toString(), delayTime);
+            if (jsonPath == null || jsonPath.trim().isEmpty()) {
+                throw new IOException("Python 未返回 JSON 文件路径");
+            }
+            tempJson = Paths.get(jsonPath.trim());
+            if (!Files.isRegularFile(tempJson)) {
+                throw new FileNotFoundException("Python 生成的 JSON 不存在: " + tempJson);
+            }
+
+            File outputDirectory = new File(outputDir);
+            File jsonOutputFile = new File(outputDirectory, baseName + ".json");
+            Files.copy(tempJson, jsonOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+            File binOutputFile = new File(outputDirectory, baseName + "_level2.bin");
+            return convertJsonToLevel2Bin(jsonOutputFile.getAbsolutePath(), binOutputFile);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            deleteTemporaryFile(tempJson);
+            deleteTemporaryFile(tempXml);
+            deleteTemporaryFile(tempDir);
+        }
+    }
+
+    private Boolean convertJsonToLevel2Bin(String jsonPath, File binOutputFile) {
+        try {
             ObjectMapper objectMapper = new ObjectMapper();
             List<DrumInfo> drumInfoArrayList = objectMapper.readValue(
                     new File(jsonPath),
@@ -1808,16 +1857,28 @@ public class UploadService {
             }
             bytes[index++] = check;
             bytes[index] = (byte) 0xEE;
-            String bin2Path = outPutPath + "\\" + fileName + "\\" + fileName + "_level2.bin";
-            DtxUtils.saveFile(bin2Path, bytes);
+            File parent = binOutputFile.getParentFile();
+            if (parent != null) {
+                Files.createDirectories(parent.toPath());
+            }
+            Files.write(binOutputFile.toPath(), bytes);
             return true;
         } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
-
     }
 
+    private void deleteTemporaryFile(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            System.err.println("临时文件清理失败: " + path + ", " + e.getMessage());
+        }
+    }
 
     public Map<String, Object> fullProcessMusicXml(MultipartFile mp3File, MultipartFile xmlFile, MultipartFile mp3TempFile, String outputDir, Integer startSecond, Integer duration, Integer delayTime, Integer beginTime, Integer endTime) {
         try {
@@ -1845,6 +1906,8 @@ public class UploadService {
             File dir = new File(outputDir, baseName);
             if (!dir.exists()) dir.mkdirs();
             String finalOutputDir = dir.getAbsolutePath();
+            File uploadedXmlFile = new File(dir, baseName + ".xml");
+            xmlFile.transferTo(uploadedXmlFile);
             CompletableFuture<Boolean> mp3Future = CompletableFuture.supplyAsync(() -> {
                 try {
                     return processMp3(mp3File, finalOutputDir, startSecond, duration);
@@ -1856,31 +1919,32 @@ public class UploadService {
 
             CompletableFuture<Boolean> xmlFuture = CompletableFuture.supplyAsync(() -> {
                 try {
-                    Boolean b = convertXml(outputDir, delayTime);
-                    if (b) {
-                        decompileXmlBin(finalOutputDir + "/" + baseName + "_level2.bin", finalOutputDir);
+                    boolean converted = convertUploadedXml(uploadedXmlFile, finalOutputDir, baseName, delayTime);
+                    if (!converted) {
+                        return false;
                     }
-                    return b;
+                    File level2Bin = new File(dir, baseName + "_level2.bin");
+                    return decompileXmlBin(level2Bin.getAbsolutePath(), finalOutputDir);
                 } catch (Exception e) {
                     e.printStackTrace();
                     return false;
                 }
             });
             CompletableFuture<Boolean> hammerFuture = CompletableFuture.supplyAsync(() -> {
+                File tempFile = null;
                 try {
-                    File tempFile = File.createTempFile("tempMp3", ".mp3");
+                    tempFile = File.createTempFile("tempMp3", ".mp3");
                     mp3TempFile.transferTo(tempFile);
-                    File tempFile2 = File.createTempFile("tempXml", ".xml");
-                    xmlFile.transferTo(tempFile2);
                     int durationFromMp3 = getDurationFromMultipartFile(tempFile);
-                    int bpm = getFirstBpmFromXml(tempFile2);
-                    boolean b = genHammerModel(finalOutputDir, beginTime, endTime, durationFromMp3, bpm, baseName).getCode() == 200;
-                    tempFile.delete();
-                    tempFile2.delete();
-                    return b;
+                    int bpm = getFirstBpmFromXml(uploadedXmlFile);
+                    return genHammerModel(finalOutputDir, beginTime, endTime, durationFromMp3, bpm, baseName).getCode() == 200;
                 } catch (Exception e) {
                     e.printStackTrace();
                     return false;
+                } finally {
+                    if (tempFile != null && tempFile.exists() && !tempFile.delete()) {
+                        System.err.println("临时 MP3 清理失败: " + tempFile.getAbsolutePath());
+                    }
                 }
             });
             // 等待所有任务完成

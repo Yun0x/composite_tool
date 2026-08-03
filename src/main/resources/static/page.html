@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>工具模块</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 32px 16px;
+            font-family: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f4f6f9;
+            color: #18212f;
+        }
+
+        main {
+            width: min(920px, 100%);
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+            line-height: 1.25;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+        }
+
+        .user {
+            min-width: max-content;
+            color: #475467;
+            font-size: 14px;
+            line-height: 1.6;
+            text-align: right;
+        }
+
+        .panel {
+            margin-bottom: 16px;
+            padding: 18px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .overview-item {
+            padding: 14px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        .overview-label {
+            margin-bottom: 6px;
+            color: #667085;
+            font-size: 12px;
+        }
+
+        .overview-value {
+            color: #18212f;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #344054;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        input {
+            width: 100%;
+            height: 44px;
+            padding: 0 12px;
+            border: 1px solid #b9c3d0;
+            border-radius: 6px;
+            outline: none;
+            font-size: 15px;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .module-card {
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px;
+            border: 1px solid #d7dee8;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
+        .module-title {
+            margin: 0 0 8px;
+            font-size: 18px;
+            line-height: 1.35;
+        }
+
+        .module-desc {
+            margin: 0;
+            color: #667085;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        button {
+            width: 100%;
+            height: 42px;
+            border: 0;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button.secondary {
+            background: #eef2f7;
+            color: #334155;
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 18px 12px 24px;
+                background: #ffffff;
+            }
+
+            .header {
+                display: block;
+                margin-bottom: 14px;
+            }
+
+            h1 {
+                font-size: 23px;
+            }
+
+            .user {
+                margin-top: 10px;
+                text-align: left;
+            }
+
+            .panel,
+            .overview-item,
+            .module-card {
+                padding: 14px;
+            }
+
+            .overview-grid,
+            .module-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            input,
+            button {
+                height: 44px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header class="header">
+        <div>
+            <h1>工具模块</h1>
+            <p class="subtitle">选择要查看的功能模块，机器编号会自动带到下一个页面。</p>
+        </div>
+        <div id="userBox" class="user"></div>
+    </header>
+
+    <section class="panel">
+        <label for="machineNo">机器编号（可选）</label>
+        <input id="machineNo" autocomplete="off" placeholder="输入后进入模块会自动带过去">
+    </section>
+
+    <section class="module-grid">
+        <article class="module-card">
+            <div>
+                <h2 class="module-title">机器 & 订单信息</h2>
+                <p class="module-desc">查看设备信息、质检信息、首笔订单和前十条订单。</p>
+            </div>
+            <button id="orderButton" type="button">进入查看</button>
+        </article>
+
+        <article class="module-card">
+            <div>
+                <h2 class="module-title">维修记录</h2>
+                <p class="module-desc">按机器编号查看维修记录，便于和订单信息快速切换。</p>
+            </div>
+            <button id="repairButton" type="button">进入查看</button>
+        </article>
+    </section>
+</main>
+
+<script>
+    const TOKEN_KEY = 'toolLoginToken';
+    const machineNoInput = document.getElementById('machineNo');
+    const orderButton = document.getElementById('orderButton');
+    const repairButton = document.getElementById('repairButton');
+    const userBox = document.getElementById('userBox');
+
+    orderButton.addEventListener('click', function () {
+        goModule('/order.html');
+    });
+
+    repairButton.addEventListener('click', function () {
+        goModule('/repair.html');
+    });
+
+    initMachineNo();
+    loadUser();
+
+    function initMachineNo() {
+        const params = new URLSearchParams(window.location.search);
+        const machineNo = params.get('machineNo');
+        if (machineNo) {
+            machineNoInput.value = machineNo;
+        }
+    }
+
+    function goModule(path) {
+        const machineNo = machineNoInput.value.trim();
+        window.location.href = machineNo ? path + '?machineNo=' + encodeURIComponent(machineNo) : path;
+    }
+
+    async function loadUser() {
+        try {
+            const response = await fetch('/me', {
+                headers: buildAuthHeaders()
+            });
+            if (response.status === 401) {
+                window.location.replace('/login.html');
+                return;
+            }
+            const data = await response.json();
+            const user = data && data.user ? data.user : {};
+            if (userBox && user.loginName) {
+                userBox.textContent = '当前用户：' + user.loginName;
+            }
+        } catch (error) {
+            if (userBox) {
+                userBox.textContent = '';
+            }
+        }
+    }
+
+    function buildAuthHeaders() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        return token ? {'X-Tool-Token': token} : {};
+    }
+</script>
+</body>
+</html>

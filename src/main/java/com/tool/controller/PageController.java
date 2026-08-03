@@ -2,66 +2,73 @@ package com.tool.controller;
 
 import com.tool.config.datasource.DataSourceContextHolder;
 import com.tool.mapper.TestMapper;
+import com.tool.util.TokenUtil;
+import com.tool.vo.testVO.ToolUser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.StreamUtils;
-import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.HashMap;
+import java.util.Map;
 
 @Controller
 public class PageController implements WebMvcConfigurer {
 
-    private static final String LOCAL_STORAGE_TOKEN_KEY = "toolLoginToken";
-    private static final long TOKEN_EXPIRE_TIME = 5 * 60 * 1000L;
-    private static final ConcurrentHashMap<String, Long> TOKEN_EXPIRE_MAP = new ConcurrentHashMap<>();
+    private static final Logger logger = LoggerFactory.getLogger(PageController.class);
+
     private final TestMapper testMapper;
+
+    @Value("${page.force-login:true}")
+    private boolean forceLogin;
 
     public PageController(TestMapper testMapper) {
         this.testMapper = testMapper;
     }
-
-    @Value("${page.force-login:true}")
-    private boolean forceLogin;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new HandlerInterceptor() {
             @Override
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-                if (!forceLogin || !"GET".equalsIgnoreCase(request.getMethod())) {
+                if (!forceLogin) {
                     return true;
                 }
+
                 String uri = getRequestUri(request);
-                if (checkIsForceLogin(uri)) {
+                if (isPublicPath(uri)) {
                     return true;
                 }
-                if (isHtmlPage(uri)) {
+
+                if (needTokenCheck(uri)) {
+                    String token = TokenUtil.resolveToken(request);
+                    ToolUser toolUser = TokenUtil.getToolUser(token);
+                    if (toolUser != null) {
+                        request.setAttribute(TokenUtil.TOOL_USER_REQUEST_ATTRIBUTE, toolUser);
+                        return true;
+                    }
+
+                    if (isApiPath(uri)) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write("{\"code\":401,\"msg\":\"登录已过期\"}");
+                        return false;
+                    }
+
                     response.sendRedirect(request.getContextPath() + "/login.html");
                     return false;
                 }
+
                 return true;
             }
         }).addPathPatterns("/**");
@@ -74,131 +81,105 @@ public class PageController implements WebMvcConfigurer {
 
     @PostMapping("/login")
     @ResponseBody
-    public Map<String, Object> login(@RequestBody Map<String, String> loginParam) {
-        cleanExpiredTokens();
+    public Map<String, Object> login(@RequestBody Map<String, String> loginParam, HttpServletResponse response) {
+        TokenUtil.cleanExpiredTokens();
 
         String username = loginParam == null ? null : loginParam.get("username");
         String password = loginParam == null ? null : loginParam.get("password");
 
-        Map<String, Object> result = new HashMap<>();
-        if (checkLogin(username, password)) {
-            String token = UUID.randomUUID().toString().replace("-", "");
-            TOKEN_EXPIRE_MAP.put(token, System.currentTimeMillis() + TOKEN_EXPIRE_TIME);
-
+        Map<String, Object> result = new HashMap<String, Object>();
+        ToolUser toolUser = checkLogin(username, password);
+        if (toolUser != null) {
+            String token = TokenUtil.createToken(toolUser);
+            addTokenCookie(response, token);
+            logger.info("用户登录成功：系统账号 {}", username);
             result.put("code", 200);
             result.put("token", token);
-            result.put("url", "/temp/order/" + token);
+            result.put("url", "/page.html");
+            result.put("user", buildUserResult(toolUser));
             return result;
         }
 
+        logger.info("method=login loginName={} username={} result=fail", "unknown", username);
         result.put("code", 401);
         result.put("msg", "账号或密码错误");
         return result;
     }
 
-    private boolean checkLogin(String username, String password) {
+    @PostMapping("/logout")
+    @ResponseBody
+    public Map<String, Object> logout(HttpServletRequest request, HttpServletResponse response) {
+        TokenUtil.removeToken(TokenUtil.resolveToken(request));
+        clearTokenCookie(response);
+        Map<String, Object> result = new HashMap<String, Object>();
+        result.put("code", 200);
+        return result;
+    }
+
+    @GetMapping("/me")
+    @ResponseBody
+    public Map<String, Object> me() {
+        Map<String, Object> result = new HashMap<String, Object>();
+        result.put("code", 200);
+        result.put("user", buildUserResult(TokenUtil.getToolUser()));
+        return result;
+    }
+
+    @GetMapping("/page")
+    public String page() {
+        return "redirect:/page.html";
+    }
+
+    @GetMapping("/order")
+    public String order() {
+        return "redirect:/order.html";
+    }
+
+    @GetMapping("/repair")
+    public String repair() {
+        return "redirect:/repair.html";
+    }
+
+    @GetMapping({"/temp/order"})
+    public String oldTempOrder() {
+        return "redirect:/order.html";
+    }
+
+    private ToolUser checkLogin(String username, String password) {
         if (isBlank(username) || isBlank(password)) {
-            return false;
+            return null;
         }
         DataSourceContextHolder.set("base");
         try {
-            String loginName = testMapper.checkToolLogin(username, password);
-            return !isBlank(loginName);
+            return testMapper.checkToolLogin(username, password);
         } finally {
             DataSourceContextHolder.clear();
         }
     }
 
-    @GetMapping({"/temp/order", "/temp/order/"})
-    public String tempOrderWithoutToken() {
-        return "redirect:/login.html";
+    private void addTokenCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie(TokenUtil.TOKEN_COOKIE_NAME, token);
+        cookie.setPath("/");
+        cookie.setHttpOnly(true);
+        cookie.setMaxAge(TokenUtil.getTokenExpireSeconds());
+        response.addCookie(cookie);
     }
 
-    @GetMapping("/temp/order/{token}")
-    public ResponseEntity<String> tempOrder(@PathVariable("token") String token) throws IOException {
-        cleanExpiredTokens();
-
-        if (!isLegalToken(token)) {
-            return redirectToLogin();
-        }
-
-        Long expireTime = TOKEN_EXPIRE_MAP.get(token);
-        long now = System.currentTimeMillis();
-        if (expireTime == null || expireTime < now) {
-            TOKEN_EXPIRE_MAP.remove(token);
-            return redirectToLogin();
-        }
-
-        String html = readOrderHtml();
-        html = localStorageCheck(html, token);
-        html = expireCheck(html);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
-                .body(html);
+    private void clearTokenCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie(TokenUtil.TOKEN_COOKIE_NAME, "");
+        cookie.setPath("/");
+        cookie.setHttpOnly(true);
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 
-    private ResponseEntity<String> redirectToLogin() {
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, "/login.html")
-                .build();
-    }
-
-    private String readOrderHtml() throws IOException {
-        ClassPathResource resource = new ClassPathResource("private/order.html");
-        try (InputStream inputStream = resource.getInputStream()) {
-            return StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+    private Map<String, Object> buildUserResult(ToolUser toolUser) {
+        Map<String, Object> user = new HashMap<String, Object>();
+        if (toolUser != null) {
+            user.put("id", toolUser.getId());
+            user.put("loginName", toolUser.getLoginName());
         }
-    }
-
-    private String localStorageCheck(String html, String token) {
-        String script = "\n<script>\n"
-                + "(function () {\n"
-                + "  var savedToken = null;\n"
-                + "  try {\n"
-                + "    savedToken = window.localStorage.getItem('" + LOCAL_STORAGE_TOKEN_KEY + "');\n"
-                + "  } catch (e) {\n"
-                + "    savedToken = null;\n"
-                + "  }\n"
-                + "  if (!savedToken || savedToken !== '" + token + "') {\n"
-                + "    document.documentElement.style.display = 'none';\n"
-                + "    window.location.replace('/login.html');\n"
-                + "  }\n"
-                + "}());\n"
-                + "</script>\n";
-        String lowerHtml = html.toLowerCase();
-        int headEndIndex = lowerHtml.indexOf("</head>");
-        if (headEndIndex >= 0) {
-            return html.substring(0, headEndIndex) + script + html.substring(headEndIndex);
-        }
-
-        int bodyStartIndex = lowerHtml.indexOf("<body");
-        if (bodyStartIndex >= 0) {
-            int bodyStartEndIndex = lowerHtml.indexOf(">", bodyStartIndex);
-            if (bodyStartEndIndex >= 0) {
-                return html.substring(0, bodyStartEndIndex + 1)
-                        + script
-                        + html.substring(bodyStartEndIndex + 1);
-            }
-        }
-
-        return script + html;
-    }
-
-    private String expireCheck(String html) {
-        String script = "\n<script>\n"
-                + "setTimeout(function () {\n"
-                + "  window.location.href = '/login.html';\n"
-                + "}, 5 * 60 * 1000);\n"
-                + "</script>\n";
-        int bodyEndIndex = html.toLowerCase().lastIndexOf("</body>");
-        if (bodyEndIndex >= 0) {
-            return html.substring(0, bodyEndIndex) + script + html.substring(bodyEndIndex);
-        }
-        return html + script;
-    }
-
-    private boolean isLegalToken(String token) {
-        return token != null && token.matches("[0-9a-fA-F]{32}");
+        return user;
     }
 
     private String getRequestUri(HttpServletRequest request) {
@@ -210,11 +191,42 @@ public class PageController implements WebMvcConfigurer {
         return uri;
     }
 
-    private boolean checkIsForceLogin(String uri) {
+    private boolean isPublicPath(String uri) {
         return "/".equals(uri)
-                || "/login.html".equals(uri)
+                || "/login".equals(uri)
+                || "/login.html".equals(uri);
+    }
+
+    private boolean needTokenCheck(String uri) {
+        return isPrivatePagePath(uri)
+                || isProtectedApiPath(uri)
+                || isHtmlPage(uri);
+    }
+
+    private boolean isPrivatePagePath(String uri) {
+        return "/page".equals(uri)
+                || "/page.html".equals(uri)
+                || "/order".equals(uri)
+                || "/order.html".equals(uri)
+                || "/repair".equals(uri)
+                || "/repair.html".equals(uri)
                 || "/temp/order".equals(uri)
                 || uri.startsWith("/temp/order/");
+    }
+
+    private boolean isProtectedApiPath(String uri) {
+        return "/logout".equals(uri)
+                || "/me".equals(uri)
+                || uri.startsWith("/api/")
+                || "/test/getFirstOrder".equals(uri)
+                || "/test/getRepairRecords".equals(uri);
+    }
+
+    private boolean isApiPath(String uri) {
+        return uri.startsWith("/api/")
+                || uri.startsWith("/test/")
+                || "/me".equals(uri)
+                || "/logout".equals(uri);
     }
 
     private boolean isHtmlPage(String uri) {
@@ -224,16 +236,4 @@ public class PageController implements WebMvcConfigurer {
     private boolean isBlank(String value) {
         return value == null || value.trim().length() == 0;
     }
-
-    private void cleanExpiredTokens() {
-        long now = System.currentTimeMillis();
-        Iterator<Map.Entry<String, Long>> iterator = TOKEN_EXPIRE_MAP.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, Long> entry = iterator.next();
-            if (entry.getValue() < now) {
-                TOKEN_EXPIRE_MAP.remove(entry.getKey(), entry.getValue());
-            }
-        }
-    }
-
 }

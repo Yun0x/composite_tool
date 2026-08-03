@@ -21,4 +21,4 @@ mybatis:
     map-underscore-to-camel-case: true
 
 page:
-  force-login: true
+  force-login: false

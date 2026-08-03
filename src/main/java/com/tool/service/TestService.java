@@ -6,10 +6,7 @@ import com.tool.config.datasource.DataSourceContextHolder;
 import com.tool.config.datasource.DynamicDataSourceProperties;
 import com.tool.mapper.TestMapper;
 import com.tool.mapper.UploadMapper;
-import com.tool.util.EmptyUtils;
-import com.tool.util.Result;
-import com.tool.util.SDCareVerifyUtil;
-import com.tool.util.YiYuanSimUtiles;
+import com.tool.util.*;
 import com.tool.vo.TSimcardInfo;
 import com.tool.vo.testVO.TCheckInfo;
 import com.tool.vo.testVO.TMachineCarInfo;
@@ -518,6 +515,14 @@ public class TestService {
         } finally {
             DataSourceContextHolder.clear();
         }
+    }
+
+    public Map<String, Object> getRepairRecords(String machineNo) {
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        result.put("code", 200);
+        result.put("records", Collections.emptyList());
+        result.put("msg", "暂无维修记录");
+        return result;
     }
 
     private Map<String, TUser> buildUserMap(List<TUser> userList) {
