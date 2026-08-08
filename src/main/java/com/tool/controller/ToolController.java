@@ -167,6 +167,61 @@ public class ToolController {
     }
 
     /**
+     * 单独生成不超过 1.3 MiB 的高质量小压缩 MP3。
+     */
+    @PostMapping("/processSmallMp3")
+    public Result<Map<String, Object>> processSmallMp3(
+            @RequestParam("file") MultipartFile mp3File,
+            @RequestParam("outputDir") String outputDir) {
+        if (mp3File == null || mp3File.isEmpty()) {
+            return Result.error(400, "MP3 文件为空");
+        }
+        if (outputDir == null || outputDir.trim().isEmpty()) {
+            return Result.error(400, "保存目录不能为空");
+        }
+        try {
+            Map<String, Object> result = uploadService.processSmallMp3(mp3File, outputDir.trim());
+            return Result.success("小压缩 MP3 生成成功", result);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(500, "小压缩 MP3 生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 仅从上传的 MP3 创建预览片段，不压缩或覆盖原歌曲。
+     */
+    @PostMapping("/createMp3Preview")
+    public Result<Map<String, Object>> createMp3Preview(
+            @RequestParam("file") MultipartFile mp3File,
+            @RequestParam("outputDir") String outputDir,
+            @RequestParam("startSecond") Double startSecond,
+            @RequestParam("endSecond") Double endSecond) {
+        if (mp3File == null || mp3File.isEmpty()) {
+            return Result.error(400, "MP3 文件为空");
+        }
+        if (outputDir == null || outputDir.trim().isEmpty()) {
+            return Result.error(400, "保存目录不能为空");
+        }
+        try {
+            Map<String, Object> result = uploadService.createMp3Preview(
+                    mp3File,
+                    outputDir.trim(),
+                    startSecond,
+                    endSecond
+            );
+            return Result.success("预览片段生成成功", result);
+        } catch (IllegalArgumentException e) {
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error(500, "预览片段生成失败：" + e.getMessage());
+        }
+    }
+
+    /**
      * @Description：全流程一键化处理
      * @author Lachesism
      * @date 2026-01-27

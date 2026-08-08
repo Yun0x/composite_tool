@@ -127,10 +127,10 @@ public class JsonPlayer {
 
     public static void main(String[] args) {
         try {
-            String jsonFile = "D:\\Downloads\\离开地球表面测试json\\离开地球表面反编译.json";
-            String mp3File = "D:\\Downloads\\离开地球表面测试json\\离开地球表面.mp3";
+            String jsonFile = "D:\\Downloads\\艾斯奥特曼\\艾斯奥特曼_level2反编译.json";
+            String mp3File = "D:\\Downloads\\艾斯奥特曼\\艾斯奥特曼_压缩.mp3";
             JsonPlayer player = new JsonPlayer();
-            player.startSyncPlay(jsonFile, mp3File, 1.0, 0.1);
+            player.startSyncPlay(jsonFile, mp3File, 1.0, 0.5);
         } catch (Exception e) {
             e.printStackTrace();
         }

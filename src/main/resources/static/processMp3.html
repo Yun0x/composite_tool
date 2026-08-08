@@ -3,219 +3,591 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MP3处理工具</title>
+    <title>MP3 处理与预览制作</title>
     <style>
         :root {
-            --primary: #ceb9ff;
-            --primary-hover: #f1e9ff;
-            --bg: #f5f9ff;
-            --card-bg: rgb(128, 178, 255);
-            --border: rgba(255, 255, 255, 0.1);
-            --text-main: #f8fafc;
-            --text-dim: #cbd5e1;
+            --primary: #6d5dfc;
+            --primary-dark: #5144d7;
+            --primary-soft: #eeecff;
+            --accent: #16a085;
+            --bg: #f4f7fb;
+            --card: #ffffff;
+            --border: #dce3ee;
+            --text: #172033;
+            --muted: #6f7b90;
+            --success: #15803d;
+            --danger: #dc2626;
+            --shadow: 0 20px 50px rgba(28, 39, 66, 0.10);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
-            color: var(--text-main);
+            margin: 0;
             min-height: 100vh;
+            font-family: Inter, "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 10% 0%, rgba(109, 93, 252, 0.13), transparent 30%),
+                radial-gradient(circle at 100% 20%, rgba(22, 160, 133, 0.11), transparent 28%),
+                var(--bg);
+            padding: 34px 18px 50px;
+        }
+
+        .workspace {
+            width: min(1420px, 100%);
+            margin: 0 auto;
+        }
+
+        .page-header {
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 40px 16px;
-        }
-
-
-        .glass-card {
-            width: 100%;
-            max-width: 900px; /* 增加最大宽度 */
-            background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 40px 32px; /* 增大内边距 */
-            box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.6);
-        }
-
-        header { text-align: center; margin-bottom: 36px; }
-        header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-        header p { font-size: 14px; color: var(--text-dim); margin-top: 6px; }
-
-        .drop-zone {
-            border: 2px dashed #283649;
-            border-radius: 16px;
-            padding: 60px 20px; /* 增大可点击区域 */
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(15, 23, 42, 0.85);
+            justify-content: space-between;
+            gap: 24px;
+            align-items: flex-end;
             margin-bottom: 24px;
         }
 
-        .drop-zone:hover, .drop-zone.drag-over {
-            border-color: var(--primary);
-            background: rgba(139, 92, 246, 0.07);
+        .page-header h1 {
+            margin: 0;
+            font-size: clamp(27px, 4vw, 38px);
+            letter-spacing: -1px;
         }
 
-        .drop-zone svg {
-            width: 50px;
-            height: 50px;
-            fill: var(--text-dim);
-            margin-bottom: 14px;
+        .page-header p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.6;
         }
+
+        .safety-note {
+            flex: 0 0 auto;
+            padding: 9px 13px;
+            border-radius: 999px;
+            color: #166534;
+            background: #dcfce7;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: minmax(360px, 0.85fr) minmax(520px, 1.35fr);
+            gap: 22px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid rgba(220, 227, 238, 0.9);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: center;
+            padding: 24px 26px 18px;
+        }
+
+        .panel-head h2 {
+            margin: 0;
+            font-size: 21px;
+        }
+
+        .panel-head p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .step-badge {
+            flex: 0 0 auto;
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 11px;
+            color: var(--primary);
+            background: var(--primary-soft);
+            font-weight: 800;
+        }
+
+        .panel-body { padding: 0 26px 26px; }
+
+        .drop-zone {
+            border: 2px dashed #aeb9ca;
+            border-radius: 18px;
+            padding: 32px 18px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s, transform .2s;
+            background: #f8faff;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: var(--primary-soft);
+            transform: translateY(-1px);
+        }
+
+        .drop-icon {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 10px;
+            border-radius: 15px;
+            color: var(--primary);
+            background: white;
+            box-shadow: 0 8px 22px rgba(79, 70, 190, .12);
+            font-size: 23px;
+        }
+
+        .drop-zone strong { display: block; font-size: 15px; }
+        .drop-zone small { display: block; color: var(--muted); margin-top: 6px; }
+        input[type="file"] { display: none; }
 
         .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px; /* 增大间距 */
-            margin-bottom: 24px;
+            gap: 15px;
+            margin-top: 18px;
         }
 
-        .input-group { display: flex; flex-direction: column; gap: 8px; }
-        .input-group.full { grid-column: span 2; }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            min-width: 0;
+        }
 
-        label { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; }
+        .field.full { grid-column: 1 / -1; }
 
-        input {
+        label {
+            font-size: 13px;
+            color: #4f5c71;
+            font-weight: 700;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px;
-            color: #ffffff;
-            font-size: 15px;
-            background: rgba(15, 23, 42, 0.6);
-            transition: border 0.2s, box-shadow 0.2s;
+            border-radius: 11px;
+            padding: 11px 12px;
+            color: var(--text);
+            background: #fff;
+            font-size: 14px;
+            transition: border-color .2s, box-shadow .2s;
         }
 
         input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+            box-shadow: 0 0 0 3px rgba(109, 93, 252, .13);
         }
 
         button {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 16px;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: 600;
+            border: 0;
+            border-radius: 12px;
+            padding: 11px 15px;
+            font: inherit;
+            font-weight: 750;
             cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
+            transition: transform .15s, background .15s, opacity .15s;
         }
 
-        button:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        button:active { transform: translateY(0); }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:hover:not(:disabled) { transform: translateY(-1px); }
+        button:disabled { cursor: not-allowed; opacity: .48; }
+        .primary { color: #fff; background: var(--primary); }
+        .primary:hover:not(:disabled) { background: var(--primary-dark); }
+        .secondary { color: var(--primary); background: var(--primary-soft); }
+        .ghost { color: #42506a; background: #eef2f7; }
+        .wide { width: 100%; margin-top: 18px; padding: 13px 16px; }
 
-        /* 结果列表 */
         .result-area {
-            margin-top: 28px;
-            max-height: 300px;
+            margin-top: 16px;
+            max-height: 230px;
             overflow-y: auto;
-            font-size: 14px;
-            border-radius: 12px;
+            font-size: 13px;
         }
 
         .status-item {
-            padding: 12px 10px;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 2px;
+            border-bottom: 1px solid #edf0f5;
             display: flex;
+            gap: 15px;
             justify-content: space-between;
             align-items: center;
         }
 
-        .success { color: #4ade80; font-weight: 600; }
-        .error { color: #fb7185; font-weight: 600; }
+        .status-item > span:first-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
 
-        #fileInput { display: none; }
+        .success { color: var(--success); font-weight: 750; }
+        .error { color: var(--danger); font-weight: 750; }
 
-        @media (max-width: 500px) {
-            .glass-card { padding: 32px 20px; width: 100%; }
-            .form-grid { gap: 16px; }
-            .drop-zone { padding: 50px 16px; }
+        .preview-panel { position: relative; }
+        .preview-panel::before {
+            content: "";
+            display: block;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        .loaded-file {
+            display: none;
+            margin-top: 16px;
+            padding: 13px 15px;
+            border-radius: 14px;
+            background: #f5f7fb;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .loaded-file.show { display: flex; }
+        .file-meta { min-width: 0; }
+        .file-name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-detail { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+        .editor {
+            margin-top: 18px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: linear-gradient(180deg, #fbfcff, #f6f8fc);
+        }
+
+        audio { width: 100%; height: 42px; }
+
+        .time-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 14px;
+            font-variant-numeric: tabular-nums;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .timeline {
+            position: relative;
+            height: 28px;
+            margin-top: 3px;
+            display: flex;
+            align-items: center;
+        }
+
+        .timeline-base,
+        .timeline-selection {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 8px;
+            border-radius: 99px;
+        }
+
+        .timeline-base { background: #dce3ee; }
+        .timeline-selection {
+            right: auto;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            box-shadow: 0 3px 9px rgba(109, 93, 252, .25);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        #previewSeek {
+            position: relative;
+            z-index: 2;
+            margin: 0;
+            background: transparent;
+        }
+
+        .trim-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .trim-card {
+            padding: 14px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid var(--border);
+        }
+
+        .trim-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .trim-card-head strong { font-size: 13px; }
+        .trim-card input[type="number"] { margin-bottom: 9px; }
+        .mini { padding: 7px 9px; border-radius: 9px; font-size: 12px; }
+
+        .editor-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .selection-summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 13px;
+            color: #3d356f;
+            background: var(--primary-soft);
+            font-size: 13px;
+        }
+
+        .selection-summary strong { font-variant-numeric: tabular-nums; }
+
+        .path-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 9px;
+        }
+
+        .preview-result {
+            display: none;
+            margin-top: 15px;
+            padding: 13px 14px;
+            border-radius: 13px;
+            font-size: 13px;
+            line-height: 1.55;
+            word-break: break-all;
+        }
+
+        .preview-result.show { display: block; }
+        .preview-result.ok { color: #14532d; background: #dcfce7; }
+        .preview-result.fail { color: #991b1b; background: #fee2e2; }
+
+        @media (max-width: 980px) {
+            .tool-grid { grid-template-columns: 1fr; }
+            .page-header { align-items: flex-start; flex-direction: column; }
+            .safety-note { align-self: flex-start; }
+        }
+
+        @media (max-width: 620px) {
+            body { padding: 20px 12px 36px; }
+            .panel-head, .panel-body { padding-left: 18px; padding-right: 18px; }
+            .form-grid, .trim-grid { grid-template-columns: 1fr; }
+            .field.full { grid-column: auto; }
+            .editor { padding: 15px; }
+            .editor-actions { grid-template-columns: 1fr; }
+            .path-row { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-
-<div class="glass-card">
-    <header>
-        <h1>MP3批量处理</h1>
-        <p>批量压缩+截取</p>
-    </header>
-
-    <div class="drop-zone" id="dropZone">
-        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-        <div id="dropText">点击或拖拽 MP3 文件至此处</div>
-        <input type="file" id="fileInput" accept=".mp3" multiple>
+<main class="workspace">
+    <div class="page-header">
+        <div>
+            <h1>MP3 处理工作台</h1>
+            <p>左侧保留原批量压缩功能，右侧用于快速试听并制作独立的歌曲预览片段。</p>
+        </div>
+        <div class="safety-note">原歌曲不会被修改</div>
     </div>
 
-    <div class="form-grid">
-        <div class="input-group">
-            <label>起始时间 (秒)</label>
-            <input type="number" id="startSecond" placeholder="0" min="0">
-        </div>
-        <div class="input-group">
-            <label>预览时长 (秒)</label>
-            <input type="number" id="duration" placeholder="不截取" min="1">
-        </div>
-        <div class="input-group full">
-            <label>输出目录</label>
-            <input type="text" id="outputDir" placeholder="C:\Users\Admin\Desktop\TestSong\正式歌曲" value="D:\Document\drumFiles\正式歌曲">
-        </div>
+    <div class="tool-grid">
+        <section class="panel" aria-labelledby="batchTitle">
+            <div class="panel-head">
+                <div>
+                    <h2 id="batchTitle">MP3 批量处理</h2>
+                    <p>原有批量压缩和可选截取功能</p>
+                </div>
+                <div class="step-badge">A</div>
+            </div>
+            <div class="panel-body">
+                <div class="drop-zone" id="batchDropZone">
+                    <div class="drop-icon">♫</div>
+                    <strong id="batchDropText">点击或拖入多个 MP3 文件</strong>
+                    <small>支持批量选择</small>
+                    <input type="file" id="batchFileInput" accept="audio/mpeg,.mp3" multiple>
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="startSecond">起始时间（秒）</label>
+                        <input type="number" id="startSecond" placeholder="0" min="0">
+                    </div>
+                    <div class="field">
+                        <label for="duration">预览时长（秒）</label>
+                        <input type="number" id="duration" placeholder="不截取" min="1">
+                    </div>
+                    <div class="field full">
+                        <label for="outputDir">输出目录</label>
+                        <input type="text" id="outputDir" value="D:\Document\drumFiles\正式歌曲">
+                    </div>
+                </div>
+
+                <button class="primary wide" id="batchSubmitBtn">开始批量处理</button>
+                <div id="batchResultArea" class="result-area"></div>
+            </div>
+        </section>
+
+        <section class="panel preview-panel" aria-labelledby="previewTitle">
+            <div class="panel-head">
+                <div>
+                    <h2 id="previewTitle">歌曲预览与裁剪</h2>
+                    <p>本地加载、快速拖动定位，单独生成预览 MP3</p>
+                </div>
+                <div class="step-badge">B</div>
+            </div>
+            <div class="panel-body">
+                <div class="drop-zone" id="previewDropZone">
+                    <div class="drop-icon">▶</div>
+                    <strong id="previewDropText">拖入一首 MP3 开始制作</strong>
+                    <small>音频先在浏览器本地加载，不会自动上传</small>
+                    <input type="file" id="previewFileInput" accept="audio/mpeg,.mp3">
+                </div>
+
+                <div class="loaded-file" id="loadedFile">
+                    <div class="file-meta">
+                        <div class="file-name" id="previewFileName">—</div>
+                        <div class="file-detail" id="previewFileDetail">—</div>
+                    </div>
+                    <button class="ghost mini" id="changeFileBtn" type="button">更换歌曲</button>
+                </div>
+
+                <div class="editor">
+                    <audio id="audioPlayer" controls preload="metadata"></audio>
+
+                    <div class="time-row">
+                        <span id="currentTimeLabel">00:00.00</span>
+                        <span id="totalTimeLabel">00:00.00</span>
+                    </div>
+                    <div class="timeline">
+                        <div class="timeline-base"></div>
+                        <div class="timeline-selection" id="timelineSelection"></div>
+                        <input type="range" id="previewSeek" min="0" max="0" value="0" step="0.01" disabled aria-label="播放位置">
+                    </div>
+
+                    <div class="trim-grid">
+                        <div class="trim-card">
+                            <div class="trim-card-head">
+                                <strong>裁剪开始</strong>
+                                <button class="secondary mini" id="markStartBtn" type="button" disabled>设为当前</button>
+                            </div>
+                            <input type="number" id="trimStartNumber" min="0" value="0" step="0.01" disabled>
+                            <input type="range" id="trimStartRange" min="0" max="0" value="0" step="0.01" disabled aria-label="裁剪开始时间">
+                        </div>
+                        <div class="trim-card">
+                            <div class="trim-card-head">
+                                <strong>裁剪结束</strong>
+                                <button class="secondary mini" id="markEndBtn" type="button" disabled>设为当前</button>
+                            </div>
+                            <input type="number" id="trimEndNumber" min="0" value="0" step="0.01" disabled>
+                            <input type="range" id="trimEndRange" min="0" max="0" value="0" step="0.01" disabled aria-label="裁剪结束时间">
+                        </div>
+                    </div>
+
+                    <div class="editor-actions">
+                        <button class="primary" id="playSelectionBtn" type="button" disabled>试听选中片段</button>
+                        <button class="ghost" id="jumpStartBtn" type="button" disabled>跳到开始点</button>
+                        <button class="ghost" id="resetSelectionBtn" type="button" disabled>重置 30 秒</button>
+                    </div>
+
+                    <div class="selection-summary">
+                        <span>当前区间</span>
+                        <strong id="selectionSummary">等待加载歌曲</strong>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="field full">
+                        <label for="previewOutputDir">预览片段保存目录</label>
+                        <div class="path-row">
+                            <input type="text" id="previewOutputDir" value="D:\Downloads">
+                            <button class="secondary" id="copyBatchDirBtn" type="button">使用左侧目录</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="primary wide" id="createPreviewBtn" disabled>生成预览 MP3</button>
+                <div class="preview-result" id="previewResult"></div>
+            </div>
+        </section>
     </div>
-
-    <button id="submitBtn">开始批量处理</button>
-
-    <div id="resultArea" class="result-area"></div>
-</div>
+</main>
 
 <script>
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const dropText = document.getElementById('dropText');
-    const btn = document.getElementById('submitBtn');
-    const resultArea = document.getElementById('resultArea');
+    const apiBase = '/tool';
 
-    dropZone.onclick = () => fileInput.click();
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); };
-    dropZone.ondragleave = () => dropZone.classList.remove('drag-over');
-    dropZone.ondrop = (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        fileInput.files = e.dataTransfer.files;
-        updateFileStatus();
-    };
-    fileInput.onchange = () => updateFileStatus();
+    const batchDropZone = document.getElementById('batchDropZone');
+    const batchFileInput = document.getElementById('batchFileInput');
+    const batchDropText = document.getElementById('batchDropText');
+    const batchSubmitBtn = document.getElementById('batchSubmitBtn');
+    const batchResultArea = document.getElementById('batchResultArea');
+    let batchFiles = [];
 
-    function updateFileStatus() {
-        const count = fileInput.files.length;
-        dropText.innerHTML = count > 0 ? `已选择 ${count} 个音频文件` : `点击或拖拽 MP3 文件至此处`;
+    batchDropZone.addEventListener('click', () => batchFileInput.click());
+    bindDragState(batchDropZone);
+    batchDropZone.addEventListener('drop', event => {
+        event.preventDefault();
+        batchDropZone.classList.remove('drag-over');
+        batchFiles = Array.from(event.dataTransfer.files).filter(isMp3);
+        updateBatchStatus();
+    });
+    batchFileInput.addEventListener('change', () => {
+        batchFiles = Array.from(batchFileInput.files).filter(isMp3);
+        updateBatchStatus();
+    });
+
+    function updateBatchStatus() {
+        batchDropText.textContent = batchFiles.length
+            ? `已选择 ${batchFiles.length} 个 MP3 文件`
+            : '点击或拖入多个 MP3 文件';
     }
 
-    btn.onclick = async () => {
-        const files = fileInput.files;
-        if (!files.length) { alert('请先选择文件'); return; }
+    batchSubmitBtn.addEventListener('click', async () => {
+        if (!batchFiles.length) {
+            alert('请先选择 MP3 文件');
+            return;
+        }
 
         const config = {
             start: document.getElementById('startSecond').value || 0,
             duration: document.getElementById('duration').value || 0,
-            dir: document.getElementById('outputDir').value
+            dir: document.getElementById('outputDir').value.trim()
         };
+        if (!config.dir) {
+            alert('请填写输出目录');
+            return;
+        }
 
-        btn.disabled = true;
-        resultArea.innerHTML = '';
-
-        for (const file of files) {
+        batchSubmitBtn.disabled = true;
+        batchResultArea.innerHTML = '';
+        for (const file of batchFiles) {
             const item = document.createElement('div');
             item.className = 'status-item';
-            item.innerHTML = `<span>${file.name}</span><span style="color:var(--text-dim)">处理中...</span>`;
-            resultArea.prepend(item);
+            const fileName = document.createElement('span');
+            fileName.textContent = file.name;
+            const status = document.createElement('span');
+            status.textContent = '处理中…';
+            item.append(fileName, status);
+            batchResultArea.prepend(item);
 
             const formData = new FormData();
             formData.append('file', file);
@@ -224,23 +596,289 @@
             formData.append('outputDir', config.dir);
 
             try {
-                const res = await fetch('http://localhost:9001/tool/processMp3', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.code === 200) {
-                    item.lastElementChild.innerHTML = '成功';
-                    item.lastElementChild.className = 'success';
-                } else {
-                    item.lastElementChild.innerHTML = '失败';
-                    item.lastElementChild.className = 'error';
-                }
-            } catch (e) {
-                item.lastElementChild.innerHTML = '失败';
-                item.lastElementChild.className = 'error';
+                const response = await fetch(`${apiBase}/processMp3`, { method: 'POST', body: formData });
+                const data = await response.json();
+                status.textContent = data.code === 200 ? '成功' : (data.message || '失败');
+                status.className = data.code === 200 ? 'success' : 'error';
+            } catch (error) {
+                status.textContent = '网络或服务异常';
+                status.className = 'error';
             }
         }
-        btn.disabled = false;
-    };
-</script>
+        batchSubmitBtn.disabled = false;
+    });
 
+    const previewDropZone = document.getElementById('previewDropZone');
+    const previewFileInput = document.getElementById('previewFileInput');
+    const previewDropText = document.getElementById('previewDropText');
+    const loadedFile = document.getElementById('loadedFile');
+    const previewFileName = document.getElementById('previewFileName');
+    const previewFileDetail = document.getElementById('previewFileDetail');
+    const changeFileBtn = document.getElementById('changeFileBtn');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const previewSeek = document.getElementById('previewSeek');
+    const currentTimeLabel = document.getElementById('currentTimeLabel');
+    const totalTimeLabel = document.getElementById('totalTimeLabel');
+    const timelineSelection = document.getElementById('timelineSelection');
+    const trimStartNumber = document.getElementById('trimStartNumber');
+    const trimEndNumber = document.getElementById('trimEndNumber');
+    const trimStartRange = document.getElementById('trimStartRange');
+    const trimEndRange = document.getElementById('trimEndRange');
+    const markStartBtn = document.getElementById('markStartBtn');
+    const markEndBtn = document.getElementById('markEndBtn');
+    const playSelectionBtn = document.getElementById('playSelectionBtn');
+    const jumpStartBtn = document.getElementById('jumpStartBtn');
+    const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+    const selectionSummary = document.getElementById('selectionSummary');
+    const previewOutputDir = document.getElementById('previewOutputDir');
+    const copyBatchDirBtn = document.getElementById('copyBatchDirBtn');
+    const createPreviewBtn = document.getElementById('createPreviewBtn');
+    const previewResult = document.getElementById('previewResult');
+
+    let previewFile = null;
+    let previewObjectUrl = null;
+    let audioDuration = 0;
+    let trimStart = 0;
+    let trimEnd = 0;
+    let stopAtSelectionEnd = false;
+
+    previewDropZone.addEventListener('click', () => previewFileInput.click());
+    changeFileBtn.addEventListener('click', () => previewFileInput.click());
+    bindDragState(previewDropZone);
+    previewDropZone.addEventListener('drop', event => {
+        event.preventDefault();
+        previewDropZone.classList.remove('drag-over');
+        const file = Array.from(event.dataTransfer.files).find(isMp3);
+        if (file) loadPreviewFile(file);
+        else showPreviewResult('请拖入有效的 MP3 文件', false);
+    });
+    previewFileInput.addEventListener('change', () => {
+        const file = previewFileInput.files[0];
+        if (file) loadPreviewFile(file);
+    });
+
+    function loadPreviewFile(file) {
+        previewFile = file;
+        stopAtSelectionEnd = false;
+        audioPlayer.pause();
+        if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = URL.createObjectURL(file);
+        audioPlayer.src = previewObjectUrl;
+        audioPlayer.load();
+        previewDropText.textContent = '已加载歌曲，可拖入另一首替换';
+        previewFileName.textContent = file.name;
+        previewFileDetail.textContent = `${formatBytes(file.size)} · 正在读取时长…`;
+        loadedFile.classList.add('show');
+        hidePreviewResult();
+    }
+
+    audioPlayer.addEventListener('loadedmetadata', () => {
+        audioDuration = Number.isFinite(audioPlayer.duration) ? audioPlayer.duration : 0;
+        if (!audioDuration) {
+            showPreviewResult('浏览器无法读取这首 MP3 的时长', false);
+            return;
+        }
+        previewFileDetail.textContent = `${formatBytes(previewFile.size)} · ${formatTime(audioDuration)}`;
+        [previewSeek, trimStartRange, trimEndRange].forEach(input => input.max = audioDuration.toFixed(2));
+        trimStartNumber.max = audioDuration.toFixed(2);
+        trimEndNumber.max = audioDuration.toFixed(2);
+        resetSelection();
+        setEditorEnabled(true);
+        totalTimeLabel.textContent = formatTime(audioDuration);
+        updateTimeline();
+    });
+
+    audioPlayer.addEventListener('timeupdate', () => {
+        previewSeek.value = Math.min(audioPlayer.currentTime, audioDuration || 0).toFixed(2);
+        currentTimeLabel.textContent = formatTime(audioPlayer.currentTime);
+        if (stopAtSelectionEnd && audioPlayer.currentTime >= trimEnd - 0.015) {
+            audioPlayer.pause();
+            audioPlayer.currentTime = trimEnd;
+            stopAtSelectionEnd = false;
+            playSelectionBtn.textContent = '试听选中片段';
+        }
+    });
+
+    audioPlayer.addEventListener('pause', () => {
+        if (!stopAtSelectionEnd) playSelectionBtn.textContent = '试听选中片段';
+    });
+
+    previewSeek.addEventListener('input', () => {
+        if (!audioDuration) return;
+        stopAtSelectionEnd = false;
+        audioPlayer.currentTime = clamp(Number(previewSeek.value), 0, audioDuration);
+        currentTimeLabel.textContent = formatTime(audioPlayer.currentTime);
+    });
+
+    trimStartRange.addEventListener('input', () => setTrimStart(Number(trimStartRange.value)));
+    trimEndRange.addEventListener('input', () => setTrimEnd(Number(trimEndRange.value)));
+    trimStartNumber.addEventListener('change', () => setTrimStart(Number(trimStartNumber.value)));
+    trimEndNumber.addEventListener('change', () => setTrimEnd(Number(trimEndNumber.value)));
+
+    markStartBtn.addEventListener('click', () => setTrimStart(audioPlayer.currentTime));
+    markEndBtn.addEventListener('click', () => setTrimEnd(audioPlayer.currentTime));
+    jumpStartBtn.addEventListener('click', () => {
+        audioPlayer.currentTime = trimStart;
+        previewSeek.value = trimStart.toFixed(2);
+    });
+    resetSelectionBtn.addEventListener('click', resetSelection);
+
+    playSelectionBtn.addEventListener('click', async () => {
+        if (!previewFile) return;
+        if (!audioPlayer.paused && stopAtSelectionEnd) {
+            stopAtSelectionEnd = false;
+            audioPlayer.pause();
+            playSelectionBtn.textContent = '试听选中片段';
+            return;
+        }
+        audioPlayer.currentTime = trimStart;
+        stopAtSelectionEnd = true;
+        playSelectionBtn.textContent = '停止试听';
+        try {
+            await audioPlayer.play();
+        } catch (error) {
+            stopAtSelectionEnd = false;
+            playSelectionBtn.textContent = '试听选中片段';
+        }
+    });
+
+    copyBatchDirBtn.addEventListener('click', () => {
+        previewOutputDir.value = document.getElementById('outputDir').value.trim();
+        previewOutputDir.focus();
+    });
+
+    createPreviewBtn.addEventListener('click', async () => {
+        if (!previewFile || !audioDuration) return;
+        const outputDir = previewOutputDir.value.trim();
+        if (!outputDir) {
+            showPreviewResult('请填写预览片段保存目录', false);
+            previewOutputDir.focus();
+            return;
+        }
+        if (trimEnd <= trimStart) {
+            showPreviewResult('结束时间必须大于开始时间', false);
+            return;
+        }
+
+        createPreviewBtn.disabled = true;
+        createPreviewBtn.textContent = '正在生成预览片段…';
+        hidePreviewResult();
+
+        const formData = new FormData();
+        formData.append('file', previewFile);
+        formData.append('outputDir', outputDir);
+        formData.append('startSecond', trimStart.toFixed(3));
+        formData.append('endSecond', trimEnd.toFixed(3));
+
+        try {
+            const response = await fetch(`${apiBase}/createMp3Preview`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (data.code === 200) {
+                showPreviewResult(`生成成功：${data.data.outputPath}（${formatTime(data.data.duration)}）`, true);
+            } else {
+                showPreviewResult(data.message || '预览片段生成失败', false);
+            }
+        } catch (error) {
+            showPreviewResult('无法连接后端服务，请确认项目已启动', false);
+        } finally {
+            createPreviewBtn.disabled = false;
+            createPreviewBtn.textContent = '生成预览 MP3';
+        }
+    });
+
+    function setTrimStart(value) {
+        if (!audioDuration) return;
+        trimStart = clamp(roundTime(value), 0, Math.max(0, trimEnd - 0.05));
+        syncTrimControls();
+    }
+
+    function setTrimEnd(value) {
+        if (!audioDuration) return;
+        trimEnd = clamp(roundTime(value), Math.min(audioDuration, trimStart + 0.05), audioDuration);
+        syncTrimControls();
+    }
+
+    function resetSelection() {
+        if (!audioDuration) return;
+        trimStart = 0;
+        trimEnd = Math.min(30, audioDuration);
+        audioPlayer.currentTime = trimStart;
+        previewSeek.value = '0';
+        syncTrimControls();
+    }
+
+    function syncTrimControls() {
+        trimStartNumber.value = trimStart.toFixed(2);
+        trimStartRange.value = trimStart.toFixed(2);
+        trimEndNumber.value = trimEnd.toFixed(2);
+        trimEndRange.value = trimEnd.toFixed(2);
+        selectionSummary.textContent = `${formatTime(trimStart)} → ${formatTime(trimEnd)} · 共 ${formatTime(trimEnd - trimStart)}`;
+        updateTimeline();
+    }
+
+    function updateTimeline() {
+        if (!audioDuration) {
+            timelineSelection.style.left = '0%';
+            timelineSelection.style.width = '0%';
+            return;
+        }
+        const left = (trimStart / audioDuration) * 100;
+        const width = ((trimEnd - trimStart) / audioDuration) * 100;
+        timelineSelection.style.left = `${left}%`;
+        timelineSelection.style.width = `${width}%`;
+    }
+
+    function setEditorEnabled(enabled) {
+        [previewSeek, trimStartNumber, trimEndNumber, trimStartRange, trimEndRange,
+            markStartBtn, markEndBtn, playSelectionBtn, jumpStartBtn,
+            resetSelectionBtn, createPreviewBtn].forEach(control => control.disabled = !enabled);
+    }
+
+    function bindDragState(zone) {
+        zone.addEventListener('dragover', event => {
+            event.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    }
+
+    function isMp3(file) {
+        return file && (file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3'));
+    }
+
+    function formatTime(seconds) {
+        const safe = Math.max(0, Number(seconds) || 0);
+        const minutes = Math.floor(safe / 60);
+        const remain = safe - minutes * 60;
+        return `${String(minutes).padStart(2, '0')}:${remain.toFixed(2).padStart(5, '0')}`;
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    function roundTime(value) {
+        return Math.round((Number(value) || 0) * 100) / 100;
+    }
+
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, Number(value) || 0));
+    }
+
+    function showPreviewResult(message, success) {
+        previewResult.textContent = message;
+        previewResult.className = `preview-result show ${success ? 'ok' : 'fail'}`;
+    }
+
+    function hidePreviewResult() {
+        previewResult.textContent = '';
+        previewResult.className = 'preview-result';
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    });
+</script>
 </body>
 </html>

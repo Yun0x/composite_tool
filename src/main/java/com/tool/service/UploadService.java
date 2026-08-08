@@ -59,6 +59,9 @@ public class UploadService {
     private ObjectMapper objectMapper;
 
     private static final int BATCH_SIZE = 1000;
+    private static final String FFMPEG_PATH = "D:\\Code\\ffmpeg\\bin\\ffmpeg.exe";
+    private static final long STANDARD_MP3_MAX_BYTES = 3L * 1024 * 1024;
+    private static final long SMALL_MP3_MAX_BYTES = (long) (1.3 * 1024 * 1024);
 
     // 记录任务进度（0-100）
     private final Map<String, Integer> progressMap = new ConcurrentHashMap<>();
@@ -479,66 +482,362 @@ public class UploadService {
     public boolean processMp3(MultipartFile file, String outputDir, Integer startSecond, Integer duration) {
         File tempFile = null;
         try {
-            File dir = new File(outputDir);
-            if (!dir.exists()) dir.mkdirs();
-
-            String originalFilename = file.getOriginalFilename();
-            if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".mp3")) {
-                return false;
-            }
-            String baseName = originalFilename.substring(0, originalFilename.lastIndexOf('.'));
-            // 目标 2.5MB，设为 2.45MB
-            long targetSizeByte = (long) (2.45 * 1024 * 1024);
+            File dir = prepareMp3OutputDirectory(outputDir);
+            String baseName = getUploadedMp3BaseName(file);
             tempFile = File.createTempFile("upload_", ".mp3");
             file.transferTo(tempFile);
-            File processedFile = new File(dir, baseName + "_压缩.mp3");
-            // 核心逻辑：无论是否超过3MB，都进行去除信息
-            // 如果超过3MB则计算比特率，否则用高质量（如192k）重新编码以剔除元数据
             long durationMs = getMp3Duration(tempFile);
-            if (durationMs <= 0) return false;
-            double durationSec = durationMs / 1000.0;
-
-            int bitrate;
-            if (tempFile.length() > (3L * 1024 * 1024)) {
-                // 计算刚好能装进 3MB 的比特率
-                bitrate = (int) ((targetSizeByte * 8) / durationSec / 1000);
-                bitrate = Math.min(Math.max(bitrate, 32), 320); // 范围限制
-            } else {
-                bitrate = 192;
+            if (durationMs <= 0) {
+                return false;
             }
-            // FFmpeg 执行：重新编码并丢弃所有元数据
-            execFFmpeg(new String[]{
-                    "D:\\Code\\ffmpeg\\bin\\ffmpeg.exe",
-                    "-y",
-                    "-i", tempFile.getAbsolutePath(),
-                    "-c:a", "libmp3lame",
-                    "-b:a", bitrate + "k",
-                    "-map_metadata", "-1",      // 剔除所有全局元数据
-                    "-map", "0:a",              // 只保留音频流，自动丢弃封面图(视频流)
-                    "-id3v2_version", "0",      // 不写入任何 ID3 标签
-                    "-ac", "2",
-                    "-ar", "44100",
-                    processedFile.getAbsolutePath()
-            });
-            if (startSecond != null && startSecond >= 0 && duration != null && duration > 0) {
-                File cut = new File(dir, baseName + "_预览.mp3");
-                execFFmpeg(new String[]{
-                        "D:\\Code\\ffmpeg\\bin\\ffmpeg.exe",
-                        "-y",
-                        "-ss", String.valueOf(startSecond),
-                        "-t", String.valueOf(duration),
-                        "-i", processedFile.getAbsolutePath(),
-                        "-c", "copy",
-                        cut.getAbsolutePath()
-                });
-            }
-
-            return true;
+            return createStandardCompressedMp3(tempFile, dir, baseName, durationMs, startSecond, duration);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
         } finally {
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            deleteTempMp3(tempFile);
+        }
+    }
+
+    /**
+     * MusicXML 全流程专用：一次上传同时生成 3 MiB 和 1.3 MiB 两个版本。
+     */
+    private Map<String, Boolean> processMp3Variants(
+            MultipartFile file,
+            String outputDir,
+            Integer startSecond,
+            Integer duration) {
+        Map<String, Boolean> result = new LinkedHashMap<>();
+        result.put("standard", false);
+        result.put("small", false);
+        File tempFile = null;
+        try {
+            File dir = prepareMp3OutputDirectory(outputDir);
+            String baseName = getUploadedMp3BaseName(file);
+            tempFile = File.createTempFile("upload_variants_", ".mp3");
+            file.transferTo(tempFile);
+            long durationMs = getMp3Duration(tempFile);
+            if (durationMs <= 0) {
+                return result;
+            }
+
+            try {
+                result.put("standard", createStandardCompressedMp3(
+                        tempFile,
+                        dir,
+                        baseName,
+                        durationMs,
+                        startSecond,
+                        duration
+                ));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            try {
+                File smallFile = new File(dir, baseName + "_小压缩.mp3");
+                compressMp3WithinLimit(tempFile, smallFile, SMALL_MP3_MAX_BYTES, durationMs);
+                result.put("small", true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return result;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return result;
+        } finally {
+            deleteTempMp3(tempFile);
+        }
+    }
+
+    /**
+     * 单独生成不超过 1.3 MiB 的小压缩 MP3。
+     */
+    public Map<String, Object> processSmallMp3(MultipartFile file, String outputDir) throws Exception {
+        File tempFile = null;
+        try {
+            File dir = prepareMp3OutputDirectory(outputDir);
+            String baseName = getUploadedMp3BaseName(file);
+            tempFile = File.createTempFile("small_mp3_upload_", ".mp3");
+            file.transferTo(tempFile);
+            long durationMs = getMp3Duration(tempFile);
+            if (durationMs <= 0) {
+                throw new IOException("无法读取 MP3 时长");
+            }
+
+            File smallFile = new File(dir, baseName + "_小压缩.mp3");
+            Mp3CompressionResult compression = compressMp3WithinLimit(
+                    tempFile,
+                    smallFile,
+                    SMALL_MP3_MAX_BYTES,
+                    durationMs
+            );
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("outputPath", smallFile.getAbsolutePath());
+            result.put("fileName", smallFile.getName());
+            result.put("fileSize", smallFile.length());
+            result.put("maxSize", SMALL_MP3_MAX_BYTES);
+            result.put("bitrateKbps", compression.bitrateKbps);
+            result.put("streamCopied", compression.streamCopied);
+            result.put("duration", durationMs / 1000.0);
+            return result;
+        } finally {
+            deleteTempMp3(tempFile);
+        }
+    }
+
+    private boolean createStandardCompressedMp3(
+            File sourceFile,
+            File outputDir,
+            String baseName,
+            long durationMs,
+            Integer startSecond,
+            Integer duration) throws Exception {
+        File processedFile = new File(outputDir, baseName + "_压缩.mp3");
+        compressMp3WithinLimit(sourceFile, processedFile, STANDARD_MP3_MAX_BYTES, durationMs);
+
+        if (startSecond != null && startSecond >= 0 && duration != null && duration > 0) {
+            File previewFile = new File(outputDir, baseName + "_预览.mp3");
+            execFFmpeg(new String[]{
+                    FFMPEG_PATH,
+                    "-y",
+                    "-ss", String.valueOf(startSecond),
+                    "-t", String.valueOf(duration),
+                    "-i", processedFile.getAbsolutePath(),
+                    "-map", "0:a:0",
+                    "-c:a", "copy",
+                    "-map_metadata", "-1",
+                    previewFile.getAbsolutePath()
+            });
+        }
+        return true;
+    }
+
+    private Mp3CompressionResult compressMp3WithinLimit(
+            File sourceFile,
+            File outputFile,
+            long maxBytes,
+            long durationMs) throws Exception {
+        if (durationMs <= 0) {
+            throw new IllegalArgumentException("MP3 时长无效");
+        }
+        File parent = outputFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("无法创建输出目录：" + parent.getAbsolutePath());
+        }
+
+        // 已满足体积限制时只复制音频流，不二次编码，音质零损失。
+        if (sourceFile.length() <= maxBytes) {
+            execFFmpeg(new String[]{
+                    FFMPEG_PATH,
+                    "-y",
+                    "-i", sourceFile.getAbsolutePath(),
+                    "-map", "0:a:0",
+                    "-vn",
+                    "-c:a", "copy",
+                    "-map_metadata", "-1",
+                    "-id3v2_version", "0",
+                    outputFile.getAbsolutePath()
+            });
+            if (isValidCompressedFile(outputFile, maxBytes)) {
+                return new Mp3CompressionResult(0, true);
+            }
+        }
+
+        double durationSeconds = durationMs / 1000.0;
+        long usableBytes = (long) (maxBytes * 0.985); // 给 MP3 帧头和 Xing 信息预留空间
+        int bitrate = (int) Math.floor((usableBytes * 8.0) / durationSeconds / 1000.0);
+        bitrate = Math.max(8, Math.min(320, bitrate));
+
+        for (int attempt = 0; attempt < 6; attempt++) {
+            encodeMp3AtBitrate(sourceFile, outputFile, bitrate);
+            if (isValidCompressedFile(outputFile, maxBytes)) {
+                return new Mp3CompressionResult(bitrate, false);
+            }
+
+            long actualSize = outputFile.length();
+            int adjusted = (int) Math.floor(bitrate * (maxBytes / (double) actualSize) * 0.97);
+            if (adjusted >= bitrate) {
+                adjusted = bitrate - 1;
+            }
+            bitrate = Math.max(8, adjusted);
+        }
+
+        throw new IOException(
+                "无法压缩到 " + formatFileSize(maxBytes)
+                        + "，当前大小：" + formatFileSize(outputFile.length())
+        );
+    }
+
+    private void encodeMp3AtBitrate(File sourceFile, File outputFile, int bitrateKbps) throws Exception {
+        int sampleRate;
+        int channels;
+        if (bitrateKbps >= 40) {
+            sampleRate = 44100;
+            channels = 2;
+        } else if (bitrateKbps >= 24) {
+            sampleRate = 24000;
+            channels = 2;
+        } else {
+            sampleRate = 16000;
+            channels = 1;
+        }
+
+        execFFmpeg(new String[]{
+                FFMPEG_PATH,
+                "-y",
+                "-i", sourceFile.getAbsolutePath(),
+                "-map", "0:a:0",
+                "-vn",
+                "-c:a", "libmp3lame",
+                "-abr", "1",
+                "-b:a", bitrateKbps + "k",
+                "-compression_level", "0",
+                "-ar", String.valueOf(sampleRate),
+                "-ac", String.valueOf(channels),
+                "-map_metadata", "-1",
+                "-id3v2_version", "0",
+                outputFile.getAbsolutePath()
+        });
+    }
+
+    private boolean isValidCompressedFile(File file, long maxBytes) {
+        return file.isFile() && file.length() > 0 && file.length() <= maxBytes;
+    }
+
+    private File prepareMp3OutputDirectory(String outputDir) throws IOException {
+        if (outputDir == null || outputDir.trim().isEmpty()) {
+            throw new IllegalArgumentException("保存目录不能为空");
+        }
+        File dir = new File(outputDir.trim());
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("无法创建保存目录：" + dir.getAbsolutePath());
+        }
+        if (!dir.isDirectory()) {
+            throw new IllegalArgumentException("保存路径不是目录：" + dir.getAbsolutePath());
+        }
+        return dir;
+    }
+
+    private String getUploadedMp3BaseName(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("MP3 文件为空");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.toLowerCase(Locale.ROOT).endsWith(".mp3")) {
+            throw new IllegalArgumentException("仅支持 MP3 文件");
+        }
+        String safeName = new File(originalFilename).getName();
+        return DtxUtils.sanitizeFileName(safeName.substring(0, safeName.lastIndexOf('.')));
+    }
+
+    private void deleteTempMp3(File tempFile) {
+        if (tempFile != null && tempFile.exists() && !tempFile.delete()) {
+            System.err.println("临时 MP3 清理失败：" + tempFile.getAbsolutePath());
+        }
+    }
+
+    private String formatFileSize(long bytes) {
+        return String.format(Locale.ROOT, "%.2f MiB", bytes / 1024.0 / 1024.0);
+    }
+
+    private static class Mp3CompressionResult {
+        private final int bitrateKbps;
+        private final boolean streamCopied;
+
+        private Mp3CompressionResult(int bitrateKbps, boolean streamCopied) {
+            this.bitrateKbps = bitrateKbps;
+            this.streamCopied = streamCopied;
+        }
+    }
+
+    public Map<String, Object> createMp3Preview(
+            MultipartFile file,
+            String outputDir,
+            Double startSecond,
+            Double endSecond) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("MP3 文件为空");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.toLowerCase(Locale.ROOT).endsWith(".mp3")) {
+            throw new IllegalArgumentException("仅支持 MP3 文件");
+        }
+        if (startSecond == null || endSecond == null
+                || Double.isNaN(startSecond) || Double.isNaN(endSecond)
+                || Double.isInfinite(startSecond) || Double.isInfinite(endSecond)) {
+            throw new IllegalArgumentException("裁剪时间无效");
+        }
+        if (startSecond < 0 || endSecond <= startSecond) {
+            throw new IllegalArgumentException("结束时间必须大于开始时间");
+        }
+
+        File targetDir = new File(outputDir);
+        if (!targetDir.exists() && !targetDir.mkdirs()) {
+            throw new IOException("无法创建保存目录：" + targetDir.getAbsolutePath());
+        }
+        if (!targetDir.isDirectory()) {
+            throw new IllegalArgumentException("保存路径不是目录：" + targetDir.getAbsolutePath());
+        }
+
+        File tempFile = File.createTempFile("preview_upload_", ".mp3");
+        try {
+            file.transferTo(tempFile);
+            long sourceDurationMs = getMp3Duration(tempFile);
+            if (sourceDurationMs <= 0) {
+                throw new IOException("无法读取 MP3 时长");
+            }
+
+            double sourceDuration = sourceDurationMs / 1000.0;
+            if (startSecond >= sourceDuration) {
+                throw new IllegalArgumentException("开始时间不能超过歌曲总时长");
+            }
+            double actualEnd = Math.min(endSecond, sourceDuration);
+            double clipDuration = actualEnd - startSecond;
+            if (clipDuration <= 0.05) {
+                throw new IllegalArgumentException("预览片段至少需要 0.05 秒");
+            }
+
+            String safeOriginalName = new File(originalFilename).getName();
+            String baseName = safeOriginalName.substring(0, safeOriginalName.lastIndexOf('.'));
+            baseName = DtxUtils.sanitizeFileName(baseName);
+            File previewFile = new File(targetDir, baseName + "_预览.mp3");
+
+            execFFmpeg(new String[]{
+                    "D:\\Code\\ffmpeg\\bin\\ffmpeg.exe",
+                    "-y",
+                    "-ss", String.format(Locale.ROOT, "%.3f", startSecond),
+                    "-i", tempFile.getAbsolutePath(),
+                    "-t", String.format(Locale.ROOT, "%.3f", clipDuration),
+                    "-map", "0:a:0",
+                    "-vn",
+                    "-c:a", "libmp3lame",
+                    "-q:a", "2",
+                    "-ar", "44100",
+                    "-ac", "2",
+                    "-map_metadata", "-1",
+                    "-id3v2_version", "0",
+                    previewFile.getAbsolutePath()
+            });
+
+            if (!previewFile.isFile() || previewFile.length() == 0) {
+                throw new IOException("FFmpeg 未生成有效的预览文件");
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("outputPath", previewFile.getAbsolutePath());
+            result.put("fileName", previewFile.getName());
+            result.put("startSecond", startSecond);
+            result.put("endSecond", actualEnd);
+            result.put("duration", clipDuration);
+            result.put("sourceDuration", sourceDuration);
+            result.put("fileSize", previewFile.length());
+            return result;
+        } finally {
+            if (tempFile.exists() && !tempFile.delete()) {
+                System.err.println("临时 MP3 清理失败：" + tempFile.getAbsolutePath());
+            }
         }
     }
 
@@ -1884,6 +2183,7 @@ public class UploadService {
         try {
             Map<String, Object> resultMap = new HashMap<>();
             resultMap.put("mp3Success", false);
+            resultMap.put("smallMp3Success", false);
             resultMap.put("xmlSuccess", false);
             resultMap.put("hammerResult", false);
             resultMap.put("overallSuccess", false);
@@ -1908,12 +2208,15 @@ public class UploadService {
             String finalOutputDir = dir.getAbsolutePath();
             File uploadedXmlFile = new File(dir, baseName + ".xml");
             xmlFile.transferTo(uploadedXmlFile);
-            CompletableFuture<Boolean> mp3Future = CompletableFuture.supplyAsync(() -> {
+            CompletableFuture<Map<String, Boolean>> mp3Future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return processMp3(mp3File, finalOutputDir, startSecond, duration);
+                    return processMp3Variants(mp3File, finalOutputDir, startSecond, duration);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    return false;
+                    Map<String, Boolean> failed = new LinkedHashMap<>();
+                    failed.put("standard", false);
+                    failed.put("small", false);
+                    return failed;
                 }
             });
 
@@ -1948,13 +2251,16 @@ public class UploadService {
                 }
             });
             // 等待所有任务完成
-            boolean mp3Result = mp3Future.join();
+            Map<String, Boolean> mp3Results = mp3Future.join();
+            boolean mp3Result = Boolean.TRUE.equals(mp3Results.get("standard"));
+            boolean smallMp3Result = Boolean.TRUE.equals(mp3Results.get("small"));
             boolean xmlResult = xmlFuture.join();
             boolean hammerResult = hammerFuture.join();
-            // 4. 最终整体成功条件：两个都成功
-            boolean overall = mp3Result && xmlResult && hammerResult;
+            // 4. 两种 MP3、XML 和地鼠模式必须全部成功
+            boolean overall = mp3Result && smallMp3Result && xmlResult && hammerResult;
             resultMap.put("overallSuccess", overall);
             resultMap.put("mp3Success", mp3Result);
+            resultMap.put("smallMp3Success", smallMp3Result);
             resultMap.put("xmlSuccess", xmlResult);
             resultMap.put("hammerResult", hammerResult);
             resultMap.put("message", overall ? "全部处理成功" : "部分处理失败");
